@@ -1,5 +1,1429 @@
 (load "pattern-matcher.scm")
+(load "pc.scm")
 
+;--------------------------------------------ass1------------------------------------------------
+
+;************************Boolean**************************************
+
+(define <Boolean>
+  (new (*parser (word-ci "#t"))
+       (*pack
+	(lambda (_) #t))
+
+       (*parser (word-ci "#f"))
+       (*pack
+	(lambda (_) #f))
+
+       (*disj 2)
+       done))
+
+;****************************^<skipped*>***********************************
+
+(define <whitespace>
+  (const
+   (lambda (ch)
+     (char<=? ch #\space))))
+
+(define <line-comment>
+  (let ((<end-of-line-comment>
+	 (new (*parser (char #\newline))
+	      (*parser <end-of-input>)
+	      (*disj 2)
+	      done)))
+    (new (*parser (char #\;))
+	 
+	 (*parser <any-char>)
+	 (*parser <end-of-line-comment>)
+	 *diff *star
+
+	 (*parser <end-of-line-comment>)
+	 (*caten 3)
+	 done)))
+
+(define <sexpr-comment>
+  (new (*parser (word "#;"))
+       (*delayed (lambda () <Sexpr>))
+       (*caten 2)
+       done))
+
+(define <comment>
+  (disj <line-comment>
+	<sexpr-comment>))
+
+(define <skip>
+  (disj <comment>
+	<whitespace>))
+
+(define ^^<wrapped>
+  (lambda (<wrapper>)
+    (lambda (<p>)
+      (new (*parser <wrapper>)
+	   (*parser <p>)
+	   (*parser <wrapper>)
+	   (*caten 3)
+	   (*pack-with
+	    (lambda (_left e _right) e))
+	   done))))
+
+(define ^<skipped*> (^^<wrapped> (star <skip>)))
+
+
+
+
+
+
+
+;***************************Number************************************
+
+(define <digit-0-9>
+  (range #\0 #\9))
+
+
+(define <digit-1-9>
+  (range #\1 #\9))
+
+
+(define <nat>
+  (new 
+       
+       (*parser <digit-0-9>) *plus
+       (*pack
+	(lambda (s)
+	  (string->number
+	   (list->string
+	    s))))
+
+       done))
+
+
+(define <int>
+  (new 
+       (*parser (char #\+))
+       (*parser <nat>)
+       (*caten 2)
+       (*pack-with
+        (lambda (_ n)
+                n))
+
+       (*parser (char #\-))
+       (*parser <nat>)
+       (*caten 2)
+       (*pack-with
+        (lambda (_ n)
+                (* -1 n)))
+
+       (*parser <nat>)
+
+       (*disj 3)
+
+       done))
+
+
+(define <rat>
+  (new (*parser <int>)
+       (*parser (char #\/))
+       (*parser <nat>)
+       (*guard (lambda (n) (not (or (not n) (zero? n)))))
+       (*caten 3)
+       (*pack-with
+	(lambda (num div den)
+	  (/ num den)))
+       done))
+
+
+(define <SymbolNotAfterNumber>
+        (new 
+                (*parser <any-char>)
+                (*parser <whitespace>)
+                (*parser (char (integer->char 40)))
+                (*parser (char (integer->char 41)))
+                (*parser (char #\[ ))
+                (*parser (char #\]))
+                ;(*parser (char #\/))
+                ;(*parser (char #\+))
+                ;(*parser (char #\-))
+                ;(*parser (char #\^))
+                (*disj 5)
+
+                *diff
+        done))
+
+
+          
+       
+
+(define <Number>
+(new 
+     (*parser <rat>)
+     (*parser <int>)
+     (*disj 2)
+
+     (*parser <SymbolNotAfterNumber>)
+
+     *not-followed-by
+     done))
+
+
+
+
+
+
+;***************************NumberInfix************************************
+
+
+
+(define <SymbolNotAfterNumberInfix>
+        (new 
+                (*parser <any-char>)
+                (*parser <whitespace>)
+                (*parser (char (integer->char 40)))
+                (*parser (char (integer->char 41)))
+                (*parser (char #\[ ))
+                (*parser (char #\]))
+                (*parser (char #\/))
+                (*parser (char #\+))
+                (*parser (char #\-))
+                (*parser (char #\^))
+		(*parser (char #\,))
+		(*parser (char #\*))
+                (*disj 11)
+
+                *diff
+        done))
+
+
+          
+       
+
+(define <NumberInfix>
+(new 
+     (*parser <rat>)
+     (*parser <int>)
+     (*disj 2)
+
+     (*parser <SymbolNotAfterNumberInfix>)
+
+     *not-followed-by
+     done))
+
+
+
+
+
+
+
+
+
+
+
+
+;***************************Char************************************
+
+(define ^<meta-char>
+  (lambda (str ch)
+    (new 
+        (*parser (word-ci str))
+	(*pack (lambda (_) ch))
+	done)))
+     
+(define <CharPrefix>
+     (new 
+          (*parser (char #\#))
+          (*parser (char #\\))
+          (*caten 2)
+          (*pack-with
+            (lambda (c1 c2)
+                list->string `(,c1 ,c2)))
+     done))
+        
+         
+(define <VisbleSimpleChar>
+    (new 
+        (*parser <any-char>)
+        (*parser (range (integer->char 0) (integer->char 32)))
+        *diff
+        (*pack (lambda (ch) ch))
+        done))
+
+(define <NamedChar>
+    (new 
+        (*parser (^<meta-char> "lambda" (integer->char 955)))
+        (*parser (^<meta-char> "newline" #\newline))
+        (*parser (^<meta-char> "nul" (integer->char 0)))
+        (*parser (^<meta-char> "page" #\page)) ; formfeed
+        (*parser (^<meta-char> "return" #\return))
+        (*parser (^<meta-char> "space" (integer->char 32)))
+        (*parser (^<meta-char> "tab" #\tab))
+        
+        (*disj 7)
+        done))
+
+(define <char-a-f>
+    (new
+        (*parser (range #\a #\f))
+        (*parser (range #\A #\F))
+        (*disj 2)
+        done))
+        
+
+; (define <HexChar>
+;     (new
+;         (*parser <digit-0-9>)
+;         (*parser <char-a-f>)
+;         (*disj 2)
+;         (*pack (lambda (ch) ch)) 
+;         done))
+
+
+(define <HexChar>
+  (let ((zero (char->integer #\0))
+	(lc-a (char->integer #\a))
+	(uc-a (char->integer #\A)))
+    (new (*parser (range #\0 #\9))
+	 (*pack
+	  (lambda (ch)
+	    (- (char->integer ch) zero)))
+
+	 (*parser (range #\a #\f))
+	 (*pack
+	  (lambda (ch)
+	    (+ 10 (- (char->integer ch) lc-a))))
+
+	 (*parser (range #\A #\F))
+	 (*pack
+	  (lambda (ch)
+	    (+ 10 (- (char->integer ch) uc-a))))
+
+	 (*disj 3)
+	 done)))
+
+
+
+
+(define (mul list) 
+    (expt 16 (- (length list) 1)))
+
+(define (getIntFromHexChars _ hex)
+    (if (null? (cdr hex))
+      (car hex)
+      (+ (getIntFromHexChars _ (cdr hex)) (* (car hex) (mul hex)))))
+	    
+
+(define <HexUnicodeChar>
+    (new
+        (*parser (char-ci #\x))
+        (*parser <HexChar>) *plus
+        (*caten 2)
+        (*pack-with
+	        getIntFromHexChars)
+        (*guard (lambda (n) (<= n 1114111)))
+        (*pack
+          (lambda (n) (integer->char n)))
+        done))
+
+;0x10FFFF
+
+(define <Char> 
+    (new 
+        (*parser <CharPrefix>)
+        
+
+        (*parser <HexUnicodeChar>)
+
+        (*parser <NamedChar>)
+
+        (*parser <VisbleSimpleChar>)
+
+        (*disj 3)
+        (*caten 2)
+        (*parser <SymbolNotAfterNumber>)
+        *not-followed-by
+        (*pack-with
+            (lambda (x y) y))
+        done))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;****************************String***********************************
+
+(define <string-meta-char>
+    (new 
+        (*parser (^<meta-char> "\\\\" #\\))
+        (*parser (^<meta-char> "\\\"" #\"))
+        (*parser (^<meta-char> "\\n" #\newline))
+        (*parser (^<meta-char> "\\r" #\return))
+        (*parser (^<meta-char> "\\t" #\tab))
+        (*parser (^<meta-char> "\\f" #\page)) ; formfeed
+        (*disj 6)
+        done))
+
+
+
+(define (getIntFromHexString _o hex _c)
+    (if (null? (cdr hex))
+      (car hex)
+      (+ (getIntFromHexString _o (cdr hex) _c) (* (car hex) (mul hex)))))
+
+(define <StringHexChar>
+  (new
+    (*parser (word-ci "\\x"))
+    (*parser <HexChar>) *star
+    (*parser (char #\;))
+    (*caten 3)
+    (*pack-with
+      getIntFromHexString)
+     (*guard (lambda (n) (<= n 1114111)))
+        (*pack
+          (lambda (n) (integer->char n)))
+    done))
+
+(define <string-char>
+  (new
+    (*parser <string-meta-char>)
+
+    (*parser <any-char>) 
+    (*parser (char #\"))
+    (*parser (char #\\))
+    (*disj 2)
+    *diff
+    
+    (*parser <StringHexChar>)
+
+    (*disj 3)
+    done))
+
+
+(define <String>
+ (new (*parser (char #\"))
+       (*parser <string-char>) *star
+       (*parser (char #\"))
+       (*caten 3)
+
+       (*pack-with
+	(lambda (open-delim chars close-delim)
+	  (list->string chars)))
+
+       done))
+
+
+
+
+
+
+
+
+
+
+
+
+
+;****************************Symbol***********************************
+
+(define <SymbolChar>
+    (new 
+        (*parser (range #\0 #\9))
+        (*parser (range #\a #\z))
+        (*parser (range #\A #\Z))
+        (*parser (char #\!))
+        (*parser (char #\$))
+        (*parser (char #\^))
+        (*parser (char #\*))
+        (*parser (char #\-))
+        (*parser (char #\_))
+        (*parser (char #\=))
+        (*parser (char #\+))
+        (*parser (char #\<))
+        (*parser (char #\>))
+        (*parser (char #\?))
+        (*parser (char #\/))
+        (*disj 15)
+        (*pack (lambda (ch) ch))
+        done))
+
+(define <Symbol>
+(new
+    (*parser <SymbolChar>) *plus
+    (*pack
+        (lambda (list)
+          (string->symbol
+                (string-downcase   
+                 (list->string list)))))
+    done))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;*****************************ProperList**********************************
+
+(define <ProperList> 
+    (new
+        (*parser (char (integer->char 40) ))
+        (*delayed (lambda () <Sexpr>)) *star
+        (*parser (char (integer->char 41) ))
+        (*caten 3)
+        (*pack-with
+            (lambda (opChar sexpr  closChar) 
+                `(,@sexpr)))
+        done))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;*****************************ImroperList**********************************
+
+(define <ImproperList> 
+    (new
+        (*parser (char (integer->char 40) ))
+        (*delayed (lambda () <Sexpr>)) *plus
+        (*parser (char #\.))
+        (*delayed (lambda () <Sexpr>))
+        (*parser (char (integer->char 41) ))
+        (*caten 5)
+        (*pack-with
+            (lambda (opChar sexprs dot sexpr closChar) 
+                `(,@sexprs ,@sexpr)))
+        done))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;*****************************Vector**********************************
+
+(define <Vector> 
+    (new
+        (*parser (char #\# ))
+        (*parser (char (integer->char 40) ))
+        (*delayed (lambda () <Sexpr>)) *star
+        (*parser (char (integer->char 41) ))
+        (*caten 4)
+        (*pack-with
+            (lambda (letteron opChar sexprs closChar) 
+                `#(,@sexprs)))
+        done))
+
+
+
+
+
+
+
+
+
+
+;*****************************Quoted**********************************
+
+(define <Quoted> 
+    (new
+        (*parser (char #\' ))
+        (*delayed (lambda () <Sexpr>))
+        (*caten 2)
+        (*pack-with
+            (lambda (letteron  sexpr) 
+                `(,'quote ,sexpr)))
+        done))
+
+
+
+
+
+
+
+
+
+
+
+;*****************************QuaziQuoted**********************************
+
+(define <QuaziQuoted> 
+    (new
+        (*parser (char #\`))
+        (*delayed (lambda () <Sexpr>))
+        (*caten 2)
+        (*pack-with
+            (lambda (letteron  sexpr) 
+                `(,'quasiquote ,sexpr)))
+        done))
+
+
+
+
+
+
+
+
+
+
+
+
+;*****************************Unquoted**********************************
+
+(define <Unquoted> 
+    (new
+        (*parser (char #\, ))
+        (*delayed (lambda () <Sexpr>))
+        (*caten 2)
+        (*pack-with
+            (lambda (letteron  sexpr) 
+                `(,'unquote ,sexpr)))
+        done))
+
+
+
+
+
+
+
+
+
+
+
+
+
+;*****************************UnquotedAndSpliced**********************************
+
+(define <UnquotedAndSpliced> 
+    (new
+        (*parser (word ",@" ))
+        (*delayed (lambda () <Sexpr>))
+        (*caten 2)
+        (*pack-with
+            (lambda (letteron  sexpr) 
+                `( ,'unquote-splicing ,sexpr)))
+        done))
+
+		
+;**********************************Infix******************************************
+(define <InfixSkip>
+  (new (*parser (word "#;"))
+	(*parser <whitespace>) *star
+       (*delayed (lambda () <InfixExpression>))
+       (*caten 3)
+       done))
+	
+
+
+(define <PowerSymbol>
+  (new (*parser (char #\^))
+       (*parser (char #\*))
+       (*parser (char #\*))
+       (*caten 2)
+       (*disj 2)
+       done))
+
+(define <SymbolInfixChar>
+    (new 
+        (*parser (range #\0 #\9))
+        (*parser (range #\a #\z))
+        (*parser (range #\A #\Z))
+	(*pack (lambda (uper) (integer->char (- (char->integer uper) (- (char->integer #\A) (char->integer #\a))))))
+        (*parser (char #\!))
+        (*parser (char #\$))
+        (*parser (char #\^))
+        (*parser (char #\*))
+        (*parser (char #\-))
+        (*parser (char #\_))
+        (*parser (char #\=))
+        (*parser (char #\+))
+        (*parser (char #\<))
+        (*parser (char #\>))
+        (*parser (char #\?))
+        (*parser (char #\/))
+        (*disj 15)
+        (*pack (lambda (ch) ch))
+        done))
+
+
+
+(define <InfixPrefixExtensionPrefix>
+    (new
+      (*parser (word "##"))
+      (*parser (word "#%"))
+      (*disj 2)
+      done))	
+
+(define <Op>
+	(new
+		(*parser (char #\+))
+		(*parser (char #\-))
+		(*parser (char #\*))
+		(*parser (char #\/))
+		(*parser <PowerSymbol>)
+		(*disj 5)
+	done))	  		
+				
+(define <InfixSymbol>
+		(new
+			(*parser <SymbolInfixChar>) 
+			(*parser <Op>)
+			*diff
+			*plus
+	(*pack
+        (lambda (list)
+          (string->symbol  
+            (list->string list))))
+		done))	
+(define <SymbolInfix> <InfixSymbol>)
+
+(define intoVecRef 
+  (lambda (into vec-ref)
+    (if (list? vec-ref)
+    (if (and (< 2 (length vec-ref)) (eq? 'vector-ref (car vec-ref)))
+        `(vector-ref ,(intoVecRef into (cadr vec-ref)) ,(caddr vec-ref))
+        `(vector-ref ,into ,(cadr vec-ref)))
+    `(vector-ref ,into ,vec-ref)
+        )))
+
+
+(define (flatten x)
+  (cond ((null? x) '())
+        ((pair? x) (append (flatten (car x)) (flatten (cdr x))))
+        (else (list x))))
+
+			
+(define <InfixArgList>
+	(new
+		(*delayed (lambda() <t>))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\,))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*pack (lambda stam '()))
+		(*delayed (lambda () <t>))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*pack (lambda stam '()))
+		(*caten 4) *star
+                (*pack-with (lambda expr (if (< 0 (length expr)) (map (lambda (a) (caddr a)) expr) '())))
+                (*caten 3)
+                (*pack-with (lambda (first _ param) (if (< 0 (length param)) (append `(,first) param) `(,first))))
+                  
+		(*parser <epsilon>)
+		(*disj 2)
+	done))
+
+(define <squareOrpsik> 	
+	(new
+
+         (*parser (char #\[))
+         (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+         (*delayed (lambda () <t>))
+         (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+         (*parser (char #\]))
+         (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+         (*delayed (lambda () <squareOrpsik>))
+         ;(*parser <squareOrpsik>)
+         (*caten 7)
+         (*pack-with (lambda (_ _2 exp _3 _4 _1 exp1)
+                       (if (and (< 2 (length exp1)) (eq? 'vector-ref (car exp1))) (intoVecRef exp exp1)
+                       `(vector-ref ,`(vector-ref ,exp) ,(cadr exp1)))))
+		                 
+         (*parser (char #\[))
+         (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+         (*delayed (lambda () <t>))
+         (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+         (*parser (char #\]))
+         (*caten 5)
+         (*pack-with (lambda (_ _2 exp _3 _1)
+                       `(vector-ref ,exp)))
+
+         (*parser (char #\())
+         (*parser <whitespace>)
+	 (*parser <InfixSkip>)
+	 (*disj 2) *star
+         (*delayed (lambda () <InfixArgList>))
+         (*parser <whitespace>)
+	 (*parser <InfixSkip>)
+	 (*disj 2) *star
+	 (*parser (char #\)))
+	 (*caten 5)
+         (*pack-with (lambda (_ _2 exp _3 _1) 
+                                     exp))
+
+         (*disj 3)
+	done))
+    
+(define <Escape>
+	(new
+	(*parser <InfixPrefixExtensionPrefix>)
+        (*parser <whitespace>)
+	(*parser <skip>)
+	(*disj 2) *star
+        (*delayed (lambda () <Sexpr>))
+        (*caten 3)
+        (*pack-with (lambda (_ _1 x) x))
+done))
+	
+
+	
+(define <End>
+	(new 	
+		(*parser (char #\-))
+		(*parser <Escape>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 4)
+                (*pack-with (lambda (_1 in _ exp)
+			(if (not (pair? exp)) `(- ,`(,in))
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) `(- ,(intoVecRef in exp))
+                       `(- ,`(vector-ref ,in ,(cadr exp))))
+                       		`(- ,(append  `(,in) exp))))))
+
+
+		(*parser (char #\-))
+		(*parser <Escape>)
+		(*caten 2)
+                (*pack-with (lambda (_ esc) `(- ,esc)))
+
+		(*parser <Escape>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 3)
+                 (*pack-with (lambda (in _ exp)
+			(if (not (pair? exp)) `(,in)
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) (intoVecRef in exp)
+                       `(vector-ref ,in ,(cadr exp)))
+				(if (= (length exp) 1) `(,in ,(car exp))
+                       			(append `(,in) exp))))))	
+		
+
+
+
+
+		(*parser <Escape>)
+
+		;(*parser <Escape>)
+                ;(*parser <whitespace>)
+		;(*parser <InfixSkip>)
+		;(*disj 2) *star
+		;(*delayed (lambda () <t>))
+		
+
+		(*parser (char #\-))
+		(*parser <NumberInfix>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 4)
+                 (*pack-with (lambda (_1 in _ exp)
+			(if (not (pair? exp)) `(,in)
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) (intoVecRef (- in) exp)
+                       `(vector-ref ,(- in) ,(cadr exp)))
+                       (append `(,(- in)) exp)))))
+
+
+		
+		(*parser (char #\-))
+		(*parser <NumberInfix>)
+		(*caten 2)
+                (*pack-with (lambda (_ num) (- num)))
+
+		(*parser (char #\-))
+		(*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <NumberInfix>)
+		(*caten 3)
+                (*pack-with (lambda (_ _1 num) `(- ,num)))
+
+		(*parser (char #\-))
+               	(*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <SymbolInfix>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 5)
+                (*pack-with (lambda (_1  _2 in _ exp)
+			(if (not (pair? exp)) `(- ,`(,in))
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) `(- ,(intoVecRef in exp))
+                       `(- ,`(vector-ref ,in ,(cadr exp))))
+                       		`(- ,(append  `(,in) exp))))))
+
+		(*parser (char #\-))
+               	(*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <SymbolInfix>)
+		(*caten 3)
+                (*pack-with (lambda (_ _1 ex) `(- ,ex)))
+
+		(*parser (char #\-))
+               	(*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <t>))
+		(*caten 3)
+                (*pack-with (lambda (_ _1 ex) `(- ,ex)))
+
+
+
+		(*parser <NumberInfix>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 3)
+                 (*pack-with (lambda (in _ exp)
+			(if (not (pair? exp)) `(,in)
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) (intoVecRef in exp)
+                       `(vector-ref ,in ,(cadr exp)))
+				(if (= (length exp) 1) `(,in ,(car exp))
+                       			(append `(,in) exp))))))
+                              
+
+
+
+		(*parser <NumberInfix>)
+
+		(*parser <InfixSymbol>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 3)
+                 (*pack-with (lambda (in _ exp)
+			(if (not (pair? exp)) `(,in)
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) (intoVecRef in exp)
+                       `(vector-ref ,in ,(cadr exp)))
+				(if (= (length exp) 1) `(,in ,(car exp))
+                       			(append `(,in) exp))))))
+
+		(*parser <InfixSymbol>)
+
+		
+		(*parser (char #\())
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <t>))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\)))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 7)
+                (*pack-with (lambda (_ _2 in _3 _4 _5 exp)
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) (intoVecRef in exp)
+                       `(vector-ref ,in ,(cadr exp)))
+                       `(,in ,(car exp)))))
+
+		(*parser (char #\())
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <t>))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\)))
+		(*caten 5)
+                (*pack-with (lambda (_ _2 exp1 _3 _4)
+                              exp1))
+					
+				 
+		;(*parser (char #\[))
+		;(*delayed (lambda () <t>))
+		;(*parser (char #\]))
+		;(*parser <squareOrpsik>)
+		;(*caten 4)
+
+
+		(*parser (char #\[))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <t>))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\]))
+		(*caten 5)
+                (*pack-with (lambda (_ _2 exp _3 _1)
+                              `(vector-ref ,exp)))
+
+
+		(*parser (char #\())
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <InfixArgList>))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\)))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <squareOrpsik>)
+		(*caten 7)
+                (*pack-with (lambda (_ _2 in _3 _4 _5 exp)
+                       (if (eq? 'vector-ref (car exp))
+                       (if (< 2 (length exp)) (intoVecRef in exp)
+                       `(vector-ref ,in ,(cadr exp)))
+                       (flatten `(,in ,exp)))))
+
+		(*parser (char #\())
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <InfixArgList>))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\)))
+		(*caten 5)
+                (*pack-with (lambda (one _ exp _1 two)
+                              `(,one ,exp ,two)))
+
+		(*disj 19)
+		
+	done))
+	
+(define <Neg>
+	(new
+		(*parser (char #\-))
+		(*parser <End>)
+                (*caten 2)
+                (*pack-with (lambda (_ num) (- num)))
+		(*parser (char #\-))
+		(*parser (char #\[))
+		(*caten 2)
+		(*parser (char #\-))
+		(*parser (char #\,))
+		(*caten 2)
+		(*disj 2)
+		*diff
+		(*parser <End>)
+		(*disj 2)
+
+	done))
+(define <PowerSymbol>
+	(new
+		(*parser (char #\^))
+		(*parser (word "**"))
+		(*disj 2)
+	done))
+
+		
+(define PowRet
+  (lambda (num exp)
+    (if (= 0 (length exp)) num
+    (if (> 2 (length exp)) `(expt ,num ,(cadar exp))
+    `(expt ,num ,(PowRet (cadar exp) (cdr exp)))))
+    ))
+(define <Pow>
+	(new
+		(*parser <End>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <PowerSymbol>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <Pow>))
+		(*caten 3)
+                (*pack-with
+                 (lambda (_1 _ exp) `(expt ,exp)))
+		(*parser <PowerSymbol>)
+		(*parser (char #\[))
+		(*caten 2)
+		(*parser <PowerSymbol>)
+		(*parser (char #\,))
+		(*caten 2)
+		(*disj 2)
+		 *diff
+		*star
+		(*caten 3)
+                (*pack-with
+                 (lambda (num _ exp) (PowRet num exp)))
+		
+	done))
+
+(define DivRet
+  (lambda (num exp)
+    (if (= 0 (length exp)) num
+        (if (> 2 (length exp)) `(/ ,num ,(cadar exp))
+          (DivRet `(/ ,num ,(cadar exp)) (cdr exp))))
+    ))
+
+(define <InfixDiv>
+	(new
+		(*parser <Pow>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\/))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <Pow>)
+		(*caten 3)
+                (*pack-with
+                 (lambda (_1 _ exp) `(/ ,exp))) 
+		(*parser (char #\/))
+		(*parser (char #\[))
+		(*caten 2)
+		(*parser (char #\/))
+		(*parser (char #\,))
+		(*caten 2)
+		(*disj 2)
+		*diff
+		*star
+		(*caten 3)
+                (*pack-with
+                 (lambda (num _ exp) (DivRet num exp)))
+
+	done))
+
+(define checkpriorityMul
+  (lambda (leftSym rightSym num exp)
+    (if (pair? exp)
+        (if (eqv? '/ (car exp)) `(/ ,(checkpriorityMul leftSym rightSym num (cadr exp)) ,(caddr exp))
+           `(* ,num ,exp) )
+        `(* ,num ,exp))))
+
+(define MulRet
+  (lambda (num exp)
+    (if (= 0 (length exp)) num
+        (if (> 2 (length exp)) (checkpriorityMul * / num (cadar exp))
+          (MulRet (checkpriorityMul * / num (cadar exp)) (cdr exp))))
+    ))	
+
+(define <InfixMul>
+	(new
+		(*parser <InfixDiv>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\*))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <InfixDiv>)
+		(*caten 3)
+                (*pack-with
+                 (lambda (_1 _ exp) `(* ,exp))) 
+		(*parser (char #\*))
+		(*parser (char #\[))
+		(*caten 2)
+		(*parser (char #\*))
+		(*parser (char #\,))
+		(*caten 2)
+		(*disj 2)
+		*diff	
+		*star
+		(*caten 3)
+                (*pack-with
+                 (lambda (num _ exp) (MulRet num exp)))
+	done))
+
+(define SubRet
+  (lambda (num exp)
+    (if (= 0 (length exp)) num
+        (if (> 2 (length exp)) `(- ,num ,(cadar exp))
+
+          (SubRet `(- ,num ,(cadar exp)) (cdr exp))))
+    ))
+	
+		
+(define <InfixSub>
+	(new
+		;(*parser (char #\-))
+                ;(*parser <whitespace>)
+		;(*parser <InfixSkip>)
+		;(*disj 2) *star
+		;(*parser <InfixSub>)
+		;(*caten 3)
+                ;(*pack-with
+                ; (lambda (_1 _ exp) `(- ,exp)))
+
+		(*parser <InfixMul>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\-))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <InfixMul>)
+		(*caten 3)
+                (*pack-with
+                 (lambda (_1 _ exp) `(- ,exp))) 
+		*star
+		(*caten 3)
+                (*pack-with
+                 (lambda (num _ exp) (SubRet num exp)))
+
+				
+
+		(*parser <InfixMul>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser (char #\-))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <InfixMul>)
+		(*caten 3)
+                (*pack-with
+                 (lambda (_1 _ exp) `(- ,exp))) 
+		(*parser (char #\-))
+		(*parser (char #\[))
+		(*caten 2)
+		(*parser (char #\-))
+		(*parser (char #\,))
+		(*caten 2)
+		(*disj 2)
+		*diff
+		*star
+		(*caten 3)
+                (*pack-with
+                 (lambda (num _ exp) (SubRet num exp)))
+		(*disj 2)
+
+	done))
+
+(define checkpriorityPlus
+  (lambda (leftSym rightSym num exp)
+    (if (pair? exp)
+        (if (eqv? '-  (car exp)) `(- ,(checkpriorityPlus leftSym rightSym num (cadr exp)) ,(caddr exp))
+            `(+ ,num ,exp))
+        `(+ ,num ,exp))))
+
+(define AddRet
+  (lambda (num exp)
+    (if (= 0 (length exp)) num
+        (if (> 2 (length exp)) (checkpriorityPlus + - num (cadar exp))
+          (AddRet (checkpriorityPlus + - num (cadar exp)) (cdr exp))))
+    ))		
+			
+(define <InfixAdd>
+	(new
+		(*parser (char #\+))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*delayed (lambda () <InfixAdd>))
+		(*caten 3)
+                (*pack-with
+                 (lambda (_1 _ exp) exp))
+
+
+
+		(*parser <InfixSub>)
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+
+		(*parser (char #\+))
+                (*parser <whitespace>)
+		(*parser <InfixSkip>)
+		(*disj 2) *star
+		(*parser <InfixSub>)
+		(*caten 3)
+                (*pack-with
+                 (lambda (_1 _ exp) `(+ ,exp)))
+		(*parser (char #\+))
+		(*parser (char #\[))
+		(*caten 2)
+		(*parser (char #\+))
+		(*parser (char #\,))
+		(*caten 2)
+		(*disj 2)
+		*diff
+		*star
+		(*caten 3)
+                (*pack-with
+                 (lambda (num _ exp) (AddRet num exp)))
+		(*disj 2)			
+	done))		
+
+
+
+(define <t>
+  (new  
+	;(*parser <InfixAdd>)
+        ;(*parser <InfixPrefixExtensionPrefix>)
+        ;(*parser <whitespace>)
+	;	(*parser <skip>)
+	;	(*disj 2) *star
+        ;(*delayed (lambda () <Sexpr>))
+        ;(*caten 4)
+        ;(*pack-with (lambda (c _ _1 x) `(,c ,x)))
+
+
+	;(*parser <InfixPrefixExtensionPrefix>)
+        ;(*parser <whitespace>)
+	;	(*parser <skip>)
+	;	(*disj 2) *star
+        ;(*delayed (lambda () <Sexpr>))
+        ;(*caten 3)
+        ;(*pack-with (lambda (_ _1 x) x))
+
+	(*parser <InfixAdd>)
+        (*parser (char #\[))
+        (*parser <InfixAdd>)
+        (*parser (char #\]))
+        (*caten 3)
+        (*parser (char #\())
+        (*parser <InfixAdd>)
+        (*parser (char #\,))
+        (*parser <InfixAdd>)
+        (*parser (char #\)))
+        (*caten 5)
+        (*disj 2)
+        *diff
+        ;(*disj 2)
+    done))
+
+(define <InfixExpression> <t>)
+
+(define <InfixExtension>
+  (new	
+
+	;(*parser <InfixPrefixExtensionPrefix>)
+	;(*parser <whitespace>)
+	;(*parser <InfixSkip>)
+	;(*disj 2) *star
+	;(*delayed (lambda () <InfixExtension>))
+	;(*caten 3)
+	;(*pack-with (lambda (_ _1 exp) (display exp) exp))
+	
+
+	(*parser <InfixPrefixExtensionPrefix>)
+       (*parser <whitespace>)
+	(*parser <InfixSkip>)
+	(*disj 2) *star
+        (*parser <InfixExpression>)
+        (*caten 3) ;*plus
+        (*pack-with (lambda (_ _1 exp) exp))
+	;(*disj 2) *plus
+	;(*pack (lambda (a) (car a)))
+        done))
+
+
+
+
+
+
+
+
+
+;*****************************Sexpr**********************************
+
+(define <Sexpr>
+    (new
+        (*parser (^<skipped*>  
+          (disj <Boolean>)))
+        (*parser (^<skipped*>  
+          (disj <Char>)))
+        (*parser (^<skipped*>  
+          (disj <Number>)))
+        (*parser (^<skipped*>  
+          (disj <String>)))
+        (*parser (^<skipped*>  
+          (disj <Symbol>)))
+        (*parser (^<skipped*>  
+          (disj <ProperList>)))
+        (*parser (^<skipped*>  
+          (disj <ImproperList>)))
+        (*parser (^<skipped*>  
+          (disj <Vector>)))
+        (*parser (^<skipped*>  
+          (disj <Quoted>)))
+        (*parser (^<skipped*>  
+          (disj <QuaziQuoted>)))
+        (*parser (^<skipped*>  
+          (disj <Unquoted>)))
+        (*parser (^<skipped*>  
+          (disj <UnquotedAndSpliced>)))   
+        (*parser (^<skipped*>  
+          (disj <InfixExtension>))) 
+        (*disj 13)
+  done))
+
+(define <sexpr> <Sexpr>)
+
+;-------------------------------------ass2
 
 (define ^quote?
   (lambda (tag)
@@ -676,3 +2100,80 @@
           ((equal? 'seq (car pe)) `(seq ,(map annotate-tc (cadr pe))))
           (else `(,(annotate-tc (car pe)))))
     ))   
+
+;-----------------------------------------------------------------------------------------------------
+;-------------------------------------Project---------------------------------------------------------
+;-----------------------------------------------------------------------------------------------------
+(define gen-start-fun
+  (lambda ()
+    ""))
+
+
+
+(define code-gen
+  (lambda (pe)
+    (cond ((or (not (pair? pe)) (null? pe)) pe);What to do?
+          ((equal? 'const (car pe)) (gen-const pe))
+
+
+
+
+
+
+
+
+
+
+
+
+
+;------------------------------------------------------------------------------
+;-----------------------------------------Compile-------------------------------
+
+(define file->string
+  (lambda (in-file)
+    (let ((in-port (open-input-file in-file)))
+      (letrec ((run
+                (lambda ()
+                  (let ((ch (read-char in-port)))
+                    (if (eof-object? ch)
+                        (begin
+                          (close-input-port in-port)
+                          '())
+                        (cons ch (run)))))))
+        (list->string
+         (run))))))
+
+(define list->file
+  (lambda (l out-file)
+    (let ((out-port (open-output-file out-file)))
+      (letrec ((run
+                (lambda (ls)
+                    (if (not (null? ls))
+                        (begin
+                          (write (car ls) out-port)
+                          (newline out-port)
+                          (run (cdr ls)))
+                        (close-output-port out-port))))))
+         (run l))
+    ))
+
+(define compile-scheme-file
+  (lambda (in-file out-file)
+    (begin (set! string-in (file->string in-file))
+           (set! sexpes (test-string <sexpr> string-in))
+           (set! parsed (parse (cadar sexpes)))
+           (set! manipulated (annotate-tc 
+                              (pe->lex-pe
+                               (box-set 
+                                (remove-applic-lambda-nil
+                                 (eliminate-nested-defines parsed))))))
+           ;tables
+           ;code-gen
+           ;add prologue & apilogue
+           (list->file l out-file)
+           )))
+
+
+
+
