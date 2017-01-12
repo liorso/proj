@@ -10,7 +10,7 @@
   (lambda (l)
     (cond ((null? l) l)
           ((null? (cadr (cdar l))) (deleteww (cdr l)))
-          ((shouldDeleteFirstww? (caadr (cdar l)) (cdr l)) (deleteww (cdr l)))
+          ((andmap (lambda (x) (shouldDeleteFirstww? x  (cdr l))) (cadr (cdar l))) (deleteww (cdr l)))
           (else `(,(car l) ,@(deleteww (cdr l)))))
     ))
 
