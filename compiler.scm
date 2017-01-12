@@ -2104,16 +2104,86 @@ done))
 ;-----------------------------------------------------------------------------------------------------
 ;-------------------------------------Project---------------------------------------------------------
 ;-----------------------------------------------------------------------------------------------------
-(define gen-start-fun
-  (lambda ()
-    ""))
+(define code-gen 1)
 
+(define lab-construct
+  (let ((index (box 0)))
+    (lambda (s)
+      (begin (set-box! index (+ 1 (unbox index)))
+             (string-append s (number->string (unbox index))))
+      )))
+    
+
+
+(define gen-const
+  (lambda (le)
+    (begin (set! const-place (find-const (cadr pe)))
+           "MOV(R0, );");TODO!
+    ))
+
+(define gen-if3
+    (lambda (pe)
+      (begin (define lab-else (lab-construct "L_if3_else_"))
+             (define lab-exit (lab-construct "L_if3_exit_"))
+             (string-append (code-gen (cadr pe))
+                            "CMP(R0, IMM(SOB_FALSE));"
+                            "\n"
+                            "JUMP_EQ(" lab-else ");"
+                            "\n"
+                            (code-gen (caddr pe))
+                            "JUMP(" lab-exit ");"
+                            "\n"
+                            lab-else ":"
+                            "\n"
+                            (code-gen (cadddr pe))
+                            lab-exit ":"
+                            "\n"))
+      ))
+
+(define gen-or-list
+  (lambda (pe lab)
+    (string-append (code-gen pe)
+                   "CMP(R0, IMM(SOB_TRUE));"
+                   "\n"
+                   "JUMP_EQ(" lab ");"
+                   "\n")
+    ))
+  
+
+(define gen-or
+  (lambda (pe)
+    (begin (define lab-exit-or (lab-construct "L_or_exit_"))
+           (string-append (fold-left string-append "" (map (lambda (x) (gen-or-list x lab-exit-or)) (cadr pe)))
+                          lab-exit-or ":" "\n"))
+    ))
+
+
+(define gen-seq
+  (lambda (pe)
+    (fold-left string-append "" (map code-gen (cadr pe)))
+    ))
+  
 
 
 (define code-gen
   (lambda (pe)
-    (cond ((or (not (pair? pe)) (null? pe)) pe);What to do?
-          ((equal? 'const (car pe)) (gen-const pe))
+    (cond ((or (not (pair? pe)) (null? pe)) "")
+          ((equal? 'if3 (car pe)) (gen-if3 pe))
+          ((equal? 'seq (car pe)) (gen-seq pe))
+          ((equal? 'or (car pe)) (gen-or pe))
+          ((equal? 'const (car pe)) (gen-const pe)) ;TODO
+          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;TODO
+          ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
+          ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
+          ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
+          ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
+          ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
+          ((equal? 'def (car pe)) (gen-def pe)) ;TODO
+          ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
+          ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
+
+          (else (string-append (code-gen (car pe)) "\n" (fold-left string-append "" (code-gen (cdr pe))))))
+    ))
 
 
 
@@ -2154,8 +2224,8 @@ done))
                           (write (car ls) out-port)
                           (newline out-port)
                           (run (cdr ls)))
-                        (close-output-port out-port))))))
-         (run l))
+                        (close-output-port out-port)))))
+         (run l)))
     ))
 
 (define compile-scheme-file
