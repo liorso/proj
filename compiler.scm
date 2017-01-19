@@ -2104,7 +2104,50 @@ done))
 ;-----------------------------------------------------------------------------------------------------
 ;-------------------------------------Project---------------------------------------------------------
 ;-----------------------------------------------------------------------------------------------------
+
+
+;------------------------------------tables-------------------------------------------------------
+(define global-table (list))
+
+(define make-global-table
+  (lambda (code)
+    (cond ((or (not (pair? code)) (null? code)) '())
+          ((equal? (car code) 'fvar) 
+           (if (not (member (cadr code) global-table)) (set! global-table (cons (cadr code) global-table))))
+          (else (begin (make-global-table (car code)) (make-global-table (cdr code)))))
+    ))
+
+(define const-table (list))
+
+(define find-const
+  (lambda (code)
+    (cond ((or (not (pair? code)) (null? code)) '())
+          ((equal? (car code) 'const) 
+           (if (not (member (cadr code) const-table)) (set! const-table (cons (cadr code) const-table))))
+          (else (begin (find-const (car code)) (find-const (cdr code)))))
+    ))
+
+
+(define make-const-table
+  (lambda (code)
+    (begin (find-const code)
+           (
+
+
+
+;------------------------------------code gen-------------------------------------------------------------
 (define code-gen 1)
+
+(define global-table-gen
+  (lambda ()
+    (string-append "*(WORD_SIZE," (number->string (length global-table)) ");";TODO: *,length of word
+                   "PUSH(R0);"
+                   "\n"
+                   "CALL(MALLOC);"
+                   "\n"
+                   "MOV(RG,R0);";TODO: in arch.h to add register RG (global)
+                   )
+    ))
 
 (define lab-construct
   (let ((index (box 0)))
@@ -2162,6 +2205,23 @@ done))
   (lambda (pe)
     (fold-left string-append "" (map code-gen (cadr pe)))
     ))
+
+(define list-index
+        (lambda (e lst)
+          (if (eq? (car lst) e)
+              0
+              (+ 1 (list-index e (cdr lst))))
+          ))
+
+(define gen-fvar ;good only for get
+  (lambda (pe)
+    (string-append "*(WORD_SIZE," (number->string (list-index (cadr pe) global-table)) ");"
+                   "\n"
+                   "+(RG, R0);"
+                   "\n"
+                   "MOV(R0,IND(R0));"
+                   "\n")
+    ))
   
 
 
@@ -2172,7 +2232,7 @@ done))
           ((equal? 'seq (car pe)) (gen-seq pe))
           ((equal? 'or (car pe)) (gen-or pe))
           ((equal? 'const (car pe)) (gen-const pe)) ;TODO
-          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;TODO
+          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;good only for get
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
@@ -2183,6 +2243,16 @@ done))
           ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
 
           (else (string-append (code-gen (car pe)) "\n" (fold-left string-append "" (code-gen (cdr pe))))))
+    ))
+
+
+(define code-gen-first
+  (lambda (pe)
+    (string-append (global-table-gen)
+                   ;TODO: apliog
+                   (code-gen pe)
+                   ;TODOL prolog
+                   )
     ))
 
 
@@ -2238,10 +2308,10 @@ done))
                                (box-set 
                                 (remove-applic-lambda-nil
                                  (eliminate-nested-defines parsed))))))
-           ;tables
-           ;code-gen
-           ;add prologue & apilogue
-           (list->file l out-file)
+           (make-global-table manipulated)
+           (make-const-table manipulated)
+           (set! genarated (code-gen-first manipulated))
+           (list->file genarated out-file);TODO: should be string to file
            )))
 
 
