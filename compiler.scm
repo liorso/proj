@@ -2119,19 +2119,42 @@ done))
 
 (define const-table (list))
 
-(define find-const
+(define find-const-in-code
   (lambda (code)
     (cond ((or (not (pair? code)) (null? code)) '())
-          ((equal? (car code) 'const) 
-           (if (not (member (cadr code) const-table)) (set! const-table (cons (cadr code) const-table))))
-          (else (begin (find-const (car code)) (find-const (cdr code)))))
+          ((equal? (car code) 'const) (cadr code))
+          (else `((find-const-in-code (car code)) ,@(find-const-in-code (cdr code))))) ; NOT GOOD!
     ))
+
+(define delete-dup
+  (lambda (e)
+    (if (or (null? e) (null? (cdr e))) e
+        (if (member (car e) (cdr e)) (delete-dup (cdr e))
+            (cons (car e) (delete-dup (cdr e)))))))
+
+(define type-const
+  (lambda (e)
+    (cond
+      ((or (number? e) (string? e) (null? e) (boolean? e)) `(,e)); was void?
+      ((pair? e)
+       `(,e ,@(type-const (car e)) ,@(type-const (cdr e))))
+       ((vector? e)
+        `(,e ,@(apply append
+                      (map type-const
+                           (vector->list e)))))
+       ((symbol? e)
+        `(,e ,@(type-const (symbol->string e))))
+       (else (type-const (cdr e)))
+       )))
 
 
 (define make-const-table
   (lambda (code)
-    (begin (find-const code)
-           (
+    (begin (set! constanst (find-const-in-code code))
+           (set! all-consts (type-const code))
+           (set! all-const-without-dup (reverse (delete-dup (reverse all-consts)))))));TODO!!!
+           
+           
 
 
 
