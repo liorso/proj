@@ -2297,7 +2297,16 @@ done))
              (labtc lab-exit)
              )))
   
-
+(define gen-or
+    (lambda (pe)
+      (begin (define lab-exit (lab-construct "L_or_exit_"))
+             (map-in-order
+              (lambda (l)
+                (begin (code-gen l)
+                       (ltc (cmp "R0" "FALSE")) ;TODO: change to false
+                       (ltc (jmp-ne lab-exit)))) (cadr pe))
+             (labtc lab-exit)
+             ))) 
 
 (define gen-def
   (lambda (pe)
@@ -2319,10 +2328,10 @@ done))
           ((equal? 'fvar (car pe)) (gen-fvar pe))
           ((equal? 'def (car pe)) (gen-def pe)) 
           ((equal? 'set (car pe)) (gen-set pe))
-          ((equal? 'seq (car pe)) (map-in-order code-gen pe))
-          ((equal? 'if3 (car pe)) (gen-if3 pe)) ;TODO
-          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
+          ((equal? 'seq (car pe)) (map-in-order code-gen (cadr pe)))
+          ((equal? 'if3 (car pe)) (gen-if3 pe))
           ((equal? 'or (car pe)) (gen-or pe));TODO
+          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           ((equal? 'const (car pe)) (gen-const pe)) ;TODO
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
