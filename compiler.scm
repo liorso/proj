@@ -2109,6 +2109,16 @@ done))
 (define CODE "")
 (define sa string-append)
 
+
+(define map-in-order
+  (lambda (proc lst)
+    (letrec ((run (lambda (new old)
+                    (if (null? old) new
+                        (run (append new (list (proc (car old)))) (cdr old))))))
+      (run '() lst))
+    ))
+
+             
 ;ltc - line to code
 (define ltc
   (lambda (toadd)
@@ -2269,74 +2279,24 @@ done))
 ;------------------------------------code gen-------------------------------------------------------------
 (define code-gen 1)
 
-(define global-table-gen
-  (lambda ()
-    (string-append "*(WORD_SIZE," (number->string (length global-table)) ");";TODO: *,length of word
-                   "PUSH(R0);"
-                   "\n"
-                   "CALL(MALLOC);"
-                   "\n"
-                   "MOV(RG,R0);";TODO: in arch.h to add register RG (global)
-                   )
-    ))
 
     
 
-
-(define gen-const
-  (lambda (le)
-    (begin (set! const-place (find-const (cadr pe)))
-           "MOV(R0, );");TODO!
-    ))
 
 (define gen-if3
     (lambda (pe)
       (begin (define lab-else (lab-construct "L_if3_else_"))
              (define lab-exit (lab-construct "L_if3_exit_"))
-             (string-append (code-gen (cadr pe))
-                            "CMP(R0, IMM(SOB_FALSE));"
-                            "\n"
-                            "JUMP_EQ(" lab-else ");"
-                            "\n"
-                            (code-gen (caddr pe))
-                            "JUMP(" lab-exit ");"
-                            "\n"
-                            lab-else ":"
-                            "\n"
-                            (code-gen (cadddr pe))
-                            lab-exit ":"
-                            "\n"))
-      ))
-
-(define gen-or-list
-  (lambda (pe lab)
-    (string-append (code-gen pe)
-                   "CMP(R0, IMM(SOB_TRUE));"
-                   "\n"
-                   "JUMP_EQ(" lab ");"
-                   "\n")
-    ))
+             (code-gen (cadr pe))
+             (ltc (cmp "R0" "FALSE")) ;TODO: change to false
+             (ltc (jmp-eq lab-else))
+             (code-gen (caddr pe))
+             (ltc (jmp lab-exit))
+             (labtc lab-else)
+             (code-gen (caddr (cdr pe)))
+             (labtc lab-exit)
+             )))
   
-
-(define gen-or
-  (lambda (pe)
-    (begin (define lab-exit-or (lab-construct "L_or_exit_"))
-           (string-append (fold-left string-append "" (map (lambda (x) (gen-or-list x lab-exit-or)) (cadr pe)))
-                          lab-exit-or ":" "\n"))
-    ))
-
-
-(define gen-seq
-  (lambda (pe)
-    (fold-left string-append "" (map code-gen (cadr pe)))
-    ))
-
-(define list-index
-        (lambda (e lst)
-          (if (eq? (car lst) e)
-              0
-              (+ 1 (list-index e (cdr lst))))
-          ))
 
 
 (define gen-def
@@ -2356,12 +2316,12 @@ done))
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
-          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;TODO
-          ((equal? 'def (car pe)) (gen-def pe)) ;TODO
-          ((equal? 'set (car pe)) (gen-set pe)) ;TODO
-          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
+          ((equal? 'fvar (car pe)) (gen-fvar pe))
+          ((equal? 'def (car pe)) (gen-def pe)) 
+          ((equal? 'set (car pe)) (gen-set pe))
+          ((equal? 'seq (car pe)) (map-in-order code-gen pe))
           ((equal? 'if3 (car pe)) (gen-if3 pe)) ;TODO
-          ((equal? 'seq (car pe)) (gen-seq pe));TODO
+          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           ((equal? 'or (car pe)) (gen-or pe));TODO
           ((equal? 'const (car pe)) (gen-const pe)) ;TODO
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
