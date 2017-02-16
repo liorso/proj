@@ -2105,18 +2105,102 @@ done))
 ;-------------------------------------Project---------------------------------------------------------
 ;-----------------------------------------------------------------------------------------------------
 
+;-----------------------------------General Tools-------------------------------------------------
+(define THE-CODE "")
+(define sa string-append)
+
+;ltc - line to code
+(define ltc
+  (lambda (line-to-add)
+    (set! THE-CODE (string-append THE-CODE (string #\tab) line-to-add ";" (string #\newline)))
+    ))
+
+;labtc - labale to code
+(define labtc
+  (let ((index (box 0)))
+    (lambda (s)
+      (begin (set-box! index (+ 1 (unbox index)))
+             (set! THE-CODE (string-append THE-CODE (string #\tab) s (number->string (unbox index)) ":" (string #\newline))))
+      )))
+
+(define mov
+  (lambda (to from)
+    (sa "MOV(" to "," from ")")
+    ))
+
+(define ind
+  (lambda (add)
+    (sa "IND(" add ")")
+    ))
+
+(define indd
+  (lambda (add1 add2)
+    (sa "INDD(" add1 "," add2 ")")
+    ))
+
+
+
 
 ;------------------------------------tables-------------------------------------------------------
+;-----------------------global-table----------
 (define global-table (list))
+(define next-free-global 0)
 
-(define make-global-table
+(define make-global-table-find
   (lambda (code)
     (cond ((or (not (pair? code)) (null? code)) '())
           ((equal? (car code) 'fvar) 
-           (if (not (member (cadr code) global-table)) (set! global-table (cons (cadr code) global-table))))
+           (if (not (member (cadr code) (map cadr global-table)))
+               (begin
+                 (set! global-table (cons (list next-free-global (cadr code)) global-table))
+                 (set! next-free-global (+ next-free-global 1)))))
           (else (begin (make-global-table (car code)) (make-global-table (cdr code)))))
     ))
 
+(define make-global-table
+  (lambda (code)
+    (begin (make-global-table-find code)
+           (set! global-table (sort (lambda (first sec) (< (car first) (car sec))) global-table))
+           )))
+
+(define lookup-global-help
+  (lambda (key table)
+    (cond ((null? table) (display "ERROR NOT FOUND IN GLOBAL TABLE"))
+          ((equal? key (cadar table)) (caar table))
+          (else (lookup-global-help key (cdr table))))
+    ))
+
+(define lookup-global
+  (lambda (key)
+    (number->string (lookup-global-help key global-table))
+    ))
+
+
+(define gen-fvar
+  (lambda (pe)
+    (ltc (mov "R0" (ind (lookup-global pe))))
+    ))
+
+(define set-free-var
+  (lambda (cmd)
+    (begin (code-gen (caddr cmd))
+           (ltc (mov (ind (lookup-global (cadr (cadr cmd)))) "R0"))
+           (ltc (mov "R0" "T_VOID")) ;TODO: real void
+           )))
+
+(define define-free-var
+  (lambda (cmd)
+    (begin (code-gen (caddr cmd))
+           (ltc (mov (ind (lookup-global (cadr (cadr cmd)))) "R0"))
+           (ltc (mov "R0" "T_VOID")) ;TODO: real void
+           )))
+           
+
+
+
+
+
+;-----------------------const-table----------
 (define const-table (list))
 
 (define find-const-in-code
@@ -2160,24 +2244,6 @@ done))
 
 ;------------------------------------code gen-------------------------------------------------------------
 (define code-gen 1)
-
-(define global-table-gen
-  (lambda ()
-    (string-append "*(WORD_SIZE," (number->string (length global-table)) ");";TODO: *,length of word
-                   "PUSH(R0);"
-                   "\n"
-                   "CALL(MALLOC);"
-                   "\n"
-                   "MOV(RG,R0);";TODO: in arch.h to add register RG (global)
-                   )
-    ))
-
-(define lab-construct
-  (let ((index (box 0)))
-    (lambda (s)
-      (begin (set-box! index (+ 1 (unbox index)))
-             (string-append s (number->string (unbox index))))
-      )))
     
 
 
@@ -2236,15 +2302,6 @@ done))
               (+ 1 (list-index e (cdr lst))))
           ))
 
-(define gen-fvar ;good only for get
-  (lambda (pe)
-    (string-append "*(WORD_SIZE," (number->string (list-index (cadr pe) global-table)) ");"
-                   "\n"
-                   "+(RG, R0);"
-                   "\n"
-                   "MOV(R0,IND(R0));"
-                   "\n")
-    ))
   
 
 
@@ -2353,9 +2410,9 @@ done))
     (begin (set! string-in (file->string in-file)) ;V
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map parse-manipulate sexpes)) ;V
-           ;(make-global-table manipulated)
+           (make-global-table manipulated) ; V
            ;(make-const-table manipulated)
-           ;(set! genarated (code-gen-first manipulated))
+           ;(code-gen-first manipulated)
            ;(string->file genarated out-file) ;V
            )))
 
