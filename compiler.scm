@@ -2177,10 +2177,10 @@ done))
   (lambda (code)
     (cond ((or (not (pair? code)) (null? code)) '())
           ((equal? (car code) 'fvar) 
-           (if (not (member (cadr code) (map cadr global-table))
+           (if (not (member (cadr code) (map cadr global-table)))
                (begin (set! global-table (cons (list next-free-global (cadr code)) global-table))
                       (set! next-free-global (+ 1 next-free-global)))))
-          (else (begin (make-global-table (car code)) (make-global-table (cdr code)))))
+          (else (begin (make-global-table-find (car code)) (make-global-table-find (cdr code)))))
     ))
 
 (define make-global-table
@@ -2200,6 +2200,27 @@ done))
   (lambda (key)
     (number->string (lookup-global-help key global-table))
     ))
+
+(define gen-fvar
+  (lambda (pe)
+    (ltc (mov "R0" (lookup-global (cadr pe))))
+    ))
+
+(define set-fvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov (lookup-global (cadr (cadr pe))) "R0"))
+    (ltc (mov "R0" "VOID")) ;TODO: void
+    ))
+
+(define def-fvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov (lookup-global (cadr (cadr pe))) "R0"))
+    (ltc (mov "R0" "VOID")) ;TODO: void
+    ))
+  
+  
 
 
 ;-----------------------const-table
@@ -2317,14 +2338,17 @@ done))
               (+ 1 (list-index e (cdr lst))))
           ))
 
-(define gen-fvar ;good only for get
+
+(define gen-def
   (lambda (pe)
-    (string-append "*(WORD_SIZE," (number->string (list-index (cadr pe) global-table)) ");"
-                   "\n"
-                   "+(RG, R0);"
-                   "\n"
-                   "MOV(R0,IND(R0));"
-                   "\n")
+    (cond ((equal? 'fvar (caadr pe)) (def-fvar pe))
+          (else "NOT IMPL")) ;TODO
+    ))
+
+(define gen-set
+  (lambda (pe)
+    (cond ((equal? 'fvar (caadr pe)) (set-fvar pe))
+          (else "NOT IMPL")) ;TODO
     ))
   
 
@@ -2332,21 +2356,23 @@ done))
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
+          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;TODO
+          ((equal? 'def (car pe)) (gen-def pe)) ;TODO
+          ((equal? 'set (car pe)) (gen-set pe)) ;TODO
+          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           ((equal? 'if3 (car pe)) (gen-if3 pe)) ;TODO
           ((equal? 'seq (car pe)) (gen-seq pe));TODO
           ((equal? 'or (car pe)) (gen-or pe));TODO
           ((equal? 'const (car pe)) (gen-const pe)) ;TODO
-          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;TODO
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
-          ((equal? 'def (car pe)) (gen-def pe)) ;TODO
           ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
           ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
 
-          (else (string-append (code-gen (car pe)) "\n" (fold-left string-append "" (code-gen (cdr pe))))))
+          (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
 
 
@@ -2418,8 +2444,7 @@ done))
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map parse-manipulate sexpes)) ;V
            (make-global-table manipulated)
-           global-table
            ;(make-const-table manipulated)
-           ;(set! genarated (code-gen-first manipulated))
-           ;(string->file genarated out-file) ;V
+           (code-gen manipulated)
+           (string->file CODE out-file) ;V
            )))
