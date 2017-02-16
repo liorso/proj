@@ -2251,11 +2251,11 @@ done))
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
-          ((equal? 'if3 (car pe)) (gen-if3 pe))
-          ((equal? 'seq (car pe)) (gen-seq pe))
-          ((equal? 'or (car pe)) (gen-or pe))
+          ((equal? 'if3 (car pe)) (gen-if3 pe)) ;TODO
+          ((equal? 'seq (car pe)) (gen-seq pe));TODO
+          ((equal? 'or (car pe)) (gen-or pe));TODO
           ((equal? 'const (car pe)) (gen-const pe)) ;TODO
-          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;good only for get
+          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;TODO
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
@@ -2307,34 +2307,56 @@ done))
         (list->string
          (run))))))
 
-(define list->file
-  (lambda (l out-file)
-    (let ((out-port (open-output-file out-file)))
+(define string->file
+  (lambda (str out-file)
+    (if (file-exists? out-file) (delete-file out-file))
+    (let ((out-port (open-output-file out-file))
+          (l (string->list str)))
       (letrec ((run
                 (lambda (ls)
                     (if (not (null? ls))
                         (begin
-                          (write (car ls) out-port)
-                          (newline out-port)
+                          (write-char (car ls) out-port)
                           (run (cdr ls)))
                         (close-output-port out-port)))))
          (run l)))
     ))
+(define string->sexpr
+  (lambda (str)
+    (<sexpr> (string->list str)
+             (lambda (e s)
+              (list e (list->string s)))
+            (lambda (klum) (display `(ERROR SEXPR))))
+    ))
+
+(define make-sexpes
+  (lambda (str)
+    (letrec ((run (lambda (slst rest)
+                     (if (eq? rest "") slst
+                         (let ((parsed (string->sexpr rest)))
+                           (run (append slst (list (car parsed))) (cadr parsed)))))))
+      (run '() str))
+    ))
+
+(define parse-manipulate
+  (lambda (sexps)
+    (annotate-tc 
+     (pe->lex-pe
+      (box-set 
+       (remove-applic-lambda-nil
+        (eliminate-nested-defines
+         (parse sexps))))))
+    ))
 
 (define compile-scheme-file
   (lambda (in-file out-file)
-    (begin (set! string-in (file->string in-file))
-           (set! sexpes (test-string <sexpr> string-in))
-           (set! parsed (parse (cadar sexpes)))
-           (set! manipulated (annotate-tc 
-                              (pe->lex-pe
-                               (box-set 
-                                (remove-applic-lambda-nil
-                                 (eliminate-nested-defines parsed))))))
-           (make-global-table manipulated)
-           (make-const-table manipulated)
-           (set! genarated (code-gen-first manipulated))
-           (list->file genarated out-file);TODO: should be string to file
+    (begin (set! string-in (file->string in-file)) ;V
+           (set! sexpes (make-sexpes string-in)) ;V
+           (set! manipulated (map parse-manipulate sexpes)) ;V
+           ;(make-global-table manipulated)
+           ;(make-const-table manipulated)
+           ;(set! genarated (code-gen-first manipulated))
+           ;(string->file genarated out-file) ;V
            )))
 
 
