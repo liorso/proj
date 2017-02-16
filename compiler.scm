@@ -2174,6 +2174,11 @@ done))
     (sa "JMP_NE(" lab ")")
     ))
 
+(define push
+  (lambda (what)
+    (sa "PUSH(" what ")")
+    ))
+
 
 
 
@@ -2297,7 +2302,31 @@ done))
              (labtc lab-exit)
              )))
   
+(define gen-or
+    (lambda (pe)
+      (begin (define lab-exit (lab-construct "L_or_exit_"))
+             (map-in-order
+              (lambda (l)
+                (begin (code-gen l)
+                       (ltc (cmp "R0" "FALSE")) ;TODO: change to false
+                       (ltc (jmp-ne lab-exit)))) (cadr pe))
+             (labtc lab-exit)
+             )))
 
+(define gen-applic
+  (lambda (pe)
+    ((begin (map-in-order
+              (lambda (l)
+                (begin (code-gen l)
+                       (ltc (push "R0"))
+                       (reverse (caddr pe)))))
+            (ltc (push (length (caddr pe))))
+            (code-gen (cadr pe))
+            (ltc (cmp (indd "R0" "0") "ClOUSE")) ;TODO: closure
+            (ltc (jmp-ne "NOT CLOSURE")) ;NOT CLOSURE
+            (ltc (push (indd "R0" "1")))
+            (ltc (;TO continue
+            
 
 (define gen-def
   (lambda (pe)
@@ -2319,17 +2348,17 @@ done))
           ((equal? 'fvar (car pe)) (gen-fvar pe))
           ((equal? 'def (car pe)) (gen-def pe)) 
           ((equal? 'set (car pe)) (gen-set pe))
-          ((equal? 'seq (car pe)) (map-in-order code-gen pe))
-          ((equal? 'if3 (car pe)) (gen-if3 pe)) ;TODO
+          ((equal? 'seq (car pe)) (map-in-order code-gen (cadr pe)))
+          ((equal? 'if3 (car pe)) (gen-if3 pe))
+          ((equal? 'or (car pe)) (gen-or pe))
+          ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
           (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
-          ((equal? 'or (car pe)) (gen-or pe));TODO
           ((equal? 'const (car pe)) (gen-const pe)) ;TODO
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
-          ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
           ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
 
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
