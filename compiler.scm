@@ -2167,17 +2167,17 @@ done))
 
 (define jmp
   (lambda (lab)
-    (sa "JMP(" lab ")")
+    (sa "JUMP(" lab ")")
     ))
 
 (define jmp-eq
   (lambda (lab)
-    (sa "JMP_EQ(" lab ")")
+    (sa "JUMP_EQ(" lab ")")
     ))
 
 (define jmp-ne
   (lambda (lab)
-    (sa "JMP_NE(" lab ")")
+    (sa "JUMP_NE(" lab ")")
     ))
 
 (define push
@@ -2322,42 +2322,6 @@ done))
 
 ;-----------------------const-table
 
-(define const-table (list))
-
-(define find-const-in-code
-  (lambda (code)
-    (cond ((or (not (pair? code)) (null? code)) '())
-          ((equal? (car code) 'const) (cadr code))
-          (else `((find-const-in-code (car code)) ,@(find-const-in-code (cdr code))))) ; NOT GOOD!
-    ))
-
-(define delete-dup
-  (lambda (e)
-    (if (or (null? e) (null? (cdr e))) e
-        (if (member (car e) (cdr e)) (delete-dup (cdr e))
-            (cons (car e) (delete-dup (cdr e)))))))
-
-(define type-const
-  (lambda (e)
-    (cond
-      ((or (number? e) (string? e) (null? e) (boolean? e)) `(,e)); was void?
-      ((pair? e)
-       `(,e ,@(type-const (car e)) ,@(type-const (cdr e))))
-       ((vector? e)
-        `(,e ,@(apply append
-                      (map type-const
-                           (vector->list e)))))
-       ((symbol? e)
-        `(,e ,@(type-const (symbol->string e))))
-       (else (type-const (cdr e)))
-       )))
-
-
-(define make-const-table
-  (lambda (code)
-    (begin (set! constanst (find-const-in-code code))
-           (set! all-consts (type-const code))
-           (set! all-const-without-dup (reverse (delete-dup (reverse all-consts)))))));TODO!!!
            
            
 
@@ -2375,8 +2339,8 @@ done))
       (begin (define lab-else (lab-construct "L_if3_else_"))
              (define lab-exit (lab-construct "L_if3_exit_"))
              (code-gen (cadr pe))
-             (ltc (cmp "R0" "FALSE")) ;TODO: change to false
-             (ltc (jmp-eq lab-else))
+             ;(ltc (cmp "R0" "FALSE")) ;TODO: change to false
+             ;(ltc (jmp-eq lab-else))
              (code-gen (caddr pe))
              (ltc (jmp lab-exit))
              (labtc lab-else)
@@ -2404,8 +2368,8 @@ done))
                        (reverse (caddr pe)))
             (ltc (push (imm (ns (length (caddr pe))))))
             (code-gen (cadr pe))
-            (ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
-            (ltc "ERROR NOT CLOSURE") ;TODO: (ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
+            ;(ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
+            ;(ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
             (ltc (sa (push (indd "R0" "1")) "/*env*/"))
             (ltc (call (indd "R0" "2")))
             (ltc (drop "1"))
@@ -2438,7 +2402,7 @@ done))
                (ltc (incr "R5"))
                (ltc (incr "R4")))))
     (malloc "3" "R0")
-    (ltc (mov (indd "R0" "0") "CLOSURE"));TODO: change to closure
+    (ltc (mov (indd "R0" "0") (imm (ns -12))));TODO: change to closure
     (ltc (mov (indd "R0" "1") "R2"))
     (set! body-leb (lab-construct "CLOS_BODY_"))
     (set! exit-clos-leb (lab-construct "EXIT_CLOS_"))
@@ -2448,8 +2412,8 @@ done))
     (labtc body-leb)
     (ltc (push "FP"))
     (ltc (mov "FP" "SP"))
-    (ltc (cmp (fparg "1") (ns (length (cadr pe)))))
-    (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+    ;(ltc (cmp (fparg "1") (ns (length (cadr pe)))))
+    ;(ltc (jmp-ne "ERROR_NUM_OF_ARG"))
     (set! major (+ 1  major))
     (code-gen (caddr pe))
     (set! major (- 1 major))
@@ -2485,8 +2449,10 @@ done))
           ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
 
+          ((equal? 'const (car pe)) (ltc (mov "R0" (ns (cadr pe))))) ;TODO
+
           (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
-          ((equal? 'const (car pe)) (gen-const pe)) ;TODO
+          
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
