@@ -2144,6 +2144,11 @@ done))
     (sa "MOV(" to "," from ")")
     ))
 
+(define imm
+  (lambda (i)
+    (sa "IMM(" i ")")
+    ))
+
 (define ind
   (lambda (add)
     (sa "IND(" add ")")
@@ -2179,8 +2184,84 @@ done))
     (sa "PUSH(" what ")")
     ))
 
+(define call
+  (lambda (proc)
+    (sa "CALL(" proc ")")
+    ))
 
+(define drop
+  (lambda (count)
+    (sa "DROP(" count ")")
+    ))
 
+(define pop
+  (lambda (reg)
+    (sa "POP(" reg ")")
+    ))
+
+(define fparg
+  (lambda (i)
+    (sa "FPARG(" i ")")
+    ))
+
+(define sub
+  (lambda (dest src)
+    (sa "SUB(" dest "," src ")")
+    ))
+
+(define add
+  (lambda (dest src)
+    (sa "ADD(" dest "," src ")")
+    ))
+
+(define div
+  (lambda (dest src)
+    (sa "DIV(" dest "," src ")")
+    ))
+
+(define MUL
+  (lambda (dest src)
+    (sa "MUL(" dest "," src ")")
+    ))
+
+(define rem
+  (lambda (dest src)
+    (sa "REM(" dest "," src ")")
+    ))
+
+(define decr
+  (lambda (dest)
+    (sa "DECR(" dest ")")
+    ))
+
+(define incr
+  (lambda (dest)
+    (sa "INCR(" dest ")")
+    ))
+
+(define malloc
+  (lambda (size to)
+    (ltc (push size))
+    (ltc (call "malloc"))
+    (ltc (drop "1"))
+    (ltc (mov to "R0"))
+    ))
+
+(define for
+  (lambda (i do)
+    (let ((exit-loop (lab-construct "FOR_EXIT_"))
+          (start-loop (lab-construct "FOR_START_")))
+      (ltc (mov "R2" i))
+      (labtc start-loop)
+      (ltc (cmp R2 "0"))
+      (ltc (jmp-eq exit-loop))
+      (ltc (push "R2"))
+      (do)
+      (ltc (pop "R2"))
+      (ltc (decr "R2"))
+      (ltc (jmp start-loop))
+      (labtc exit-loop))
+    ))
 
 ;------------------------------------tables-------------------------------------------------------
 
@@ -2315,17 +2396,25 @@ done))
 
 (define gen-applic
   (lambda (pe)
-    ((begin (map-in-order
+    (begin (map-in-order
               (lambda (l)
                 (begin (code-gen l)
                        (ltc (push "R0"))
                        (reverse (caddr pe)))))
             (ltc (push (length (caddr pe))))
             (code-gen (cadr pe))
-            (ltc (cmp (indd "R0" "0") "ClOUSE")) ;TODO: closure
+            (ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
             (ltc (jmp-ne "NOT CLOSURE")) ;NOT CLOSURE
-            (ltc (push (indd "R0" "1")))
-            (ltc (;TO continue
+            (ltc (sa (push (indd "R0" "1")) "/*env*/"))
+            (ltc (call (indd "R0" "2")))
+            (ltc (drop "1"))
+            (ltc (pop "R1"))
+            (ltc (drop "R1"))
+            )))
+
+(define gen-lambda-simple
+  (lambda (pe)
+    (
             
 
 (define gen-def
@@ -2352,11 +2441,12 @@ done))
           ((equal? 'if3 (car pe)) (gen-if3 pe))
           ((equal? 'or (car pe)) (gen-or pe))
           ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
+          ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
+
           (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           ((equal? 'const (car pe)) (gen-const pe)) ;TODO
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
-          ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
           ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
@@ -2419,12 +2509,12 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    (annotate-tc 
+    ;(annotate-tc TODO
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
         (eliminate-nested-defines
-         (parse sexps))))))
+         (parse sexps)))));)
     ))
 
 (define compile-scheme-file
