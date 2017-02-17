@@ -2108,6 +2108,7 @@ done))
 ;--------------------------------------------General tools--------------------------
 (define CODE "")
 (define sa string-append)
+(define ns number->string)
 
 
 (define map-in-order
@@ -2251,14 +2252,14 @@ done))
   (lambda (i do)
     (let ((exit-loop (lab-construct "FOR_EXIT_"))
           (start-loop (lab-construct "FOR_START_")))
-      (ltc (mov "R2" i))
+      (ltc (mov "R10" i))
       (labtc start-loop)
       (ltc (cmp R2 "0"))
       (ltc (jmp-eq exit-loop))
-      (ltc (push "R2"))
+      (ltc (push "R10"))
       (do)
-      (ltc (pop "R2"))
-      (ltc (decr "R2"))
+      (ltc (pop "R10"))
+      (ltc (decr "R10"))
       (ltc (jmp start-loop))
       (labtc exit-loop))
     ))
@@ -2404,7 +2405,7 @@ done))
             (ltc (push (length (caddr pe))))
             (code-gen (cadr pe))
             (ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
-            (ltc (jmp-ne "NOT CLOSURE")) ;NOT CLOSURE
+            (ltc "ERROR NOT CLOSURE") ;TODO: (ltc (jmp-ne "NOT CLOSURE")) ;NOT CLOSURE
             (ltc (sa (push (indd "R0" "1")) "/*env*/"))
             (ltc (call (indd "R0" "2")))
             (ltc (drop "1"))
@@ -2412,9 +2413,50 @@ done))
             (ltc (drop "R1"))
             )))
 
+(define major 0)
+
 (define gen-lambda-simple
   (lambda (pe)
-    (
+    (ltc (mov "R1" (fparg "0")))
+    (malloc (ns major) "R2")
+    (ltc (mov "R4" (ns 0)))
+    (ltc (mov "R5" (ns 1)))
+    (for (ns (- major 1))
+      (lambda () (begin (ltc (mov "R6" (ind "R1" "R4")))
+                        (ltc (mov (ind "R2" "R5") "R6"))
+                        (ltc (incr "R4"))
+                        (ltc (incr "R5")))))
+    (ltc (mov "R3" (fparg "1")))
+    (malloc "R3" (ind "R2" "0"))
+    (ltc (mov "R4" (ns 0)))
+    (ltc (mov "R5" (ns 2)))
+    (ltc (mov "R7" (indd "R2" "0")))
+    (for "R3"
+      (lambda ()
+        (begin (ltc (mov "R6" (fparg "R5")))
+               (ltc (mov (indd "R7" "R4") "R6"))
+               (ltc (incr "R5"))
+               (ltc (incr "R4")))))
+    (malloc "3" "R0")
+    (ltc (mov (indd "R0" "0") "CLOSURE"));TODO: change to closure
+    (ltc (mov (indd "R0" "1") "R2"))
+    (set! body-leb (lab-construct "CLOS_BODY_"))
+    (set! exit-clos-leb (lab-construct "EXIT_CLOS_"))
+    (ltc (mov (indd "R0" "2") body-leb))
+    (ltc (jmp exit-clos-leb))
+
+    (labtc body-leb)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))
+    (ltc (cmp (fparg "1") (ns (legnth (cadr pe)))))
+    (ltc "ERROR NUM OF ARG") ;(ltc (jmp-ne ("ERROR NUM OF ARG")))
+    (set! major (+ 1  major))
+    (code-gen (caddr pe))
+    (set! major (- 1 major))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    (labtc exit-clos-leb)))
+    
             
 
 (define gen-def
