@@ -2240,10 +2240,15 @@ done))
     (sa "INCR(" dest ")")
     ))
 
+(define lab
+  (lambda (l)
+    (sa "LABEL(" l ")")
+    ))
+
 (define malloc
   (lambda (size to)
     (ltc (push size))
-    (ltc (call "malloc"))
+    (ltc (call "MALLOC"))
     (ltc (drop "1"))
     (ltc (mov to "R0"))
     ))
@@ -2283,8 +2288,9 @@ done))
 (define make-global-table
   (lambda (code)
     (begin (make-global-table-find code)
-           (set! global-table (sort (lambda (first sec) (< (car first) (car sec))) global-table)))
-    ))
+           (set! global-table (sort (lambda (first sec) (< (car first) (car sec))) global-table))
+           (malloc (ns (length global-table)) "R15")
+    )))
 
 (define lookup-global-help
   (lambda (key table)
@@ -2300,7 +2306,7 @@ done))
 
 (define gen-fvar
   (lambda (pe)
-    (ltc (mov "R0" (lookup-global (cadr pe))))
+    (ltc (mov "R0" (ind (lookup-global (cadr pe)))))
     ))
 
 (define set-fvar
@@ -2313,8 +2319,8 @@ done))
 (define def-fvar
   (lambda (pe)
     (code-gen (caddr pe))
-    (ltc (mov (lookup-global (cadr (cadr pe))) "R0"))
-    (ltc (mov "R0" "VOID")) ;TODO: void
+    (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
+    ;(ltc (mov "R0" "VOID")) ;TODO: void
     ))
   
   
@@ -2371,7 +2377,7 @@ done))
             ;(ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
             ;(ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
             (ltc (sa (push (indd "R0" "1")) "/*env*/"))
-            (ltc (call (indd "R0" "2")))
+            (ltc (call (sa "*" (indd "R0" "2"))))
             (ltc (drop "1"))
             (ltc (pop "R1"))
             (ltc (drop "R1"))
@@ -2402,11 +2408,11 @@ done))
                (ltc (incr "R5"))
                (ltc (incr "R4")))))
     (malloc "3" "R0")
-    (ltc (mov (indd "R0" "0") (imm (ns -12))));TODO: change to closure
+    ;(ltc (mov (indd "R0" "0") (imm (ns -22))));TODO: change to closure
     (ltc (mov (indd "R0" "1") "R2"))
     (set! body-leb (lab-construct "CLOS_BODY_"))
     (set! exit-clos-leb (lab-construct "EXIT_CLOS_"))
-    (ltc (mov (indd "R0" "2") body-leb))
+    (ltc (mov (indd "R0" "2") (lab body-leb)))
     (ltc (jmp exit-clos-leb))
 
     (labtc body-leb)
@@ -2449,7 +2455,8 @@ done))
           ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
 
-          ((equal? 'const (car pe)) (ltc (mov "R0" (ns (cadr pe))))) ;TODO
+          ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
+                                           (ltc (call "MAKE_SOB_INTEGER")))) ;TODO
 
           (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           
@@ -2498,6 +2505,7 @@ done))
                         (close-output-port out-port)))))
          (run l)))
     ))
+
 (define string->sexpr
   (lambda (str)
     (<sexpr> (string->list str)
@@ -2527,15 +2535,17 @@ done))
 
 (define compile-scheme-file
   (lambda (in-file out-file)
-    (begin (set! string-in (file->string in-file)) ;V
+    (begin (set! CODE "")
+           (set! global-table (list))
+           (set! constant-table (list))
+           (set! string-in (file->string in-file)) ;V
            (set! sexpes (make-sexpes string-in)) ;V
-           (set! manipulated (if (= 1 (length sexpes)) (parse-manipulate sexpes)
-                                 (map parse-manipulate sexpes))) ;V
+           (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
            (set! CODE (sa CODE (file->string "prolog.c")))
            (make-global-table manipulated)
            ;(make-const-table manipulated)
-           (code-gen manipulated)
+           (map-in-order code-gen manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V
-           manipulated
+manipulated
            )))
