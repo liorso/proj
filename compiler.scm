@@ -2259,7 +2259,7 @@ done))
           (start-loop (lab-construct "FOR_START_")))
       (ltc (mov "R10" i))
       (labtc start-loop)
-      (ltc (cmp "R2" "0"))
+      (ltc (cmp "R10" "0"))
       (ltc (jmp-eq exit-loop))
       (ltc (push "R10"))
       (do)
@@ -2312,8 +2312,8 @@ done))
 (define set-fvar
   (lambda (pe)
     (code-gen (caddr pe))
-    (ltc (mov (lookup-global (cadr (cadr pe))) "R0"))
-    (ltc (mov "R0" "VOID")) ;TODO: void
+    (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
+    ;(ltc (mov "R0" "VOID")) ;TODO: void
     ))
 
 (define def-fvar
@@ -2387,45 +2387,52 @@ done))
 
 (define gen-lambda-simple
   (lambda (pe)
-    (ltc (mov "R1" (fparg "0")))
-    (malloc (ns (+ 1 major)) "R2")
-    (ltc (mov "R4" (ns 0)))
-    (ltc (mov "R5" (ns 1)))
-    (for (ns major)
-      (lambda () (begin (ltc (mov "R6" (indd "R1" "R4")))
-                        (ltc (mov (indd "R2" "R5") "R6"))
-                        (ltc (incr "R4"))
-                        (ltc (incr "R5")))))
-    (ltc (mov "R3" (fparg "1")))
-    (malloc "R3" (indd "R2" "0"))
-    (ltc (mov "R4" (ns 0)))
-    (ltc (mov "R5" (ns 2)))
-    (ltc (mov "R7" (indd "R2" "0")))
-    (for "R3"
-      (lambda ()
-        (begin (ltc (mov "R6" (fparg "R5")))
-               (ltc (mov (indd "R7" "R4") "R6"))
-               (ltc (incr "R5"))
-               (ltc (incr "R4")))))
-    (malloc "3" "R0")
-    ;(ltc (mov (indd "R0" "0") (imm (ns -22))));TODO: change to closure
-    (ltc (mov (indd "R0" "1") "R2"))
-    (set! body-leb (lab-construct "CLOS_BODY_"))
-    (set! exit-clos-leb (lab-construct "EXIT_CLOS_"))
-    (ltc (mov (indd "R0" "2") (lab body-leb)))
-    (ltc (jmp exit-clos-leb))
-
-    (labtc body-leb)
-    (ltc (push "FP"))
-    (ltc (mov "FP" "SP"))
-    ;(ltc (cmp (fparg "1") (ns (length (cadr pe)))))
-    ;(ltc (jmp-ne "ERROR_NUM_OF_ARG"))
-    (set! major (+ 1  major))
-    (code-gen (caddr pe))
-    (set! major (- 1 major))
-    (ltc (pop "FP"))
-    (ltc "RETURN")
-    (labtc exit-clos-leb)))
+    (let ((body-leb (lab-construct "CLOS_BODY_"))
+          (exit-clos-leb (lab-construct "EXIT_CLOS_")))
+      (begin 
+        (ltc (mov "R1" (fparg "0")))
+        (malloc (ns (+ 1 major)) "R2")
+        (ltc (mov "R4" (ns 0)))
+        (ltc (mov "R5" (ns 1)))
+        (for (ns major)
+          (lambda () (begin (ltc (mov "R6" (indd "R1" "R4")))
+                            (ltc (mov (indd "R2" "R5") "R6"))
+                            (ltc (incr "R4"))
+                            (ltc (incr "R5")))))
+        (ltc (mov "R3" (fparg "1")))
+        (malloc "R3" (indd "R2" "0"))
+        (ltc (mov "R4" (ns 0)))
+        (ltc (mov "R5" (ns 2)))
+        (ltc (mov "R7" (indd "R2" "0")))
+        (for "R3"
+          (lambda ()
+            (begin (ltc (mov "R6" (fparg "R5")))
+                   (ltc (mov (indd "R7" "R4") "R6"))
+                   (ltc (incr "R5"))
+                   (ltc (incr "R4")))))
+        (malloc "3" "R0")
+        ;(ltc (mov (indd "R0" "0") (imm (ns -22))));TODO: change to closure
+        (ltc (mov (indd "R0" "1") "R2"))
+        (ltc (mov (indd "R0" "2") (lab body-leb)))
+        (ltc (jmp exit-clos-leb))
+        
+        (labtc body-leb)
+        (ltc (push "FP"))
+        (ltc (mov "FP" "SP"))
+        ;(ltc (cmp (fparg "1") (ns (length (cadr pe)))))
+        ;(ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+        (set! major (+ 1  major))
+        (code-gen (caddr pe))
+        (set! major (- 1 major))
+        (ltc (pop "FP"))
+        (ltc "RETURN")
+        (labtc exit-clos-leb)))
+    ))
+    
+(define gen-pvar
+  (lambda (pe)
+    (ltc (mov "R0" (fparg (ns (+ 2 (caddr pe))))))
+    ))
     
             
 
@@ -2454,13 +2461,16 @@ done))
           ((equal? 'or (car pe)) (gen-or pe))
           ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
+          ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
+
 
           ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
-                                           (ltc (call "MAKE_SOB_INTEGER")))) ;TODO
+                                           (ltc (call "MAKE_SOB_INTEGER"))
+                                           (ltc (drop (ns 1))))) ;TODO
+
 
           (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           
-          ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
@@ -2533,11 +2543,18 @@ done))
          (parse sexps)))));)
     ))
 
-(define compile-scheme-file
-  (lambda (in-file out-file)
+(define initial-params
+  (lambda ()
     (begin (set! CODE "")
            (set! global-table (list))
            (set! constant-table (list))
+           (set! major 0)
+           (set! next-free-global 0))
+    ))
+
+(define compile-scheme-file
+  (lambda (in-file out-file)
+    (begin (initial-params)
            (set! string-in (file->string in-file)) ;V
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
@@ -2547,5 +2564,5 @@ done))
            (map-in-order code-gen manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V
-manipulated
+           manipulated
            )))
