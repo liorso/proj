@@ -2105,49 +2105,33 @@ done))
 ;-------------------------------------Project---------------------------------------------------------
 ;-----------------------------------------------------------------------------------------------------
 
+;--------------------------------------------General tools--------------------------
+(define CODE "")
+(define sa string-append)
+(define ns number->string)
 
-;------------------------------------tables-------------------------------------------------------
-(define global-table (list))
 
-(define make-global-table
-  (lambda (code)
-    (cond ((or (not (pair? code)) (null? code)) '())
-          ((equal? (car code) 'fvar) 
-           (if (not (member (cadr code) global-table)) (set! global-table (cons (cadr code) global-table))))
-          (else (begin (make-global-table (car code)) (make-global-table (cdr code)))))
+(define map-in-order
+  (lambda (proc lst)
+    (letrec ((run (lambda (new old)
+                    (if (null? old) new
+                        (run (append new (list (proc (car old)))) (cdr old))))))
+      (run '() lst))
     ))
 
-(define const-table (list))
-
-(define find-const
-  (lambda (code)
-    (cond ((or (not (pair? code)) (null? code)) '())
-          ((equal? (car code) 'const) 
-           (if (not (member (cadr code) const-table)) (set! const-table (cons (cadr code) const-table))))
-          (else (begin (find-const (car code)) (find-const (cdr code)))))
+             
+;ltc - line to code
+(define ltc
+  (lambda (toadd)
+    (set! CODE (sa CODE toadd ";" (string #\newline)))
     ))
 
-
-(define make-const-table
-  (lambda (code)
-    (begin (find-const code)
-           (
-
-
-
-;------------------------------------code gen-------------------------------------------------------------
-(define code-gen 1)
-
-(define global-table-gen
-  (lambda ()
-    (string-append "*(WORD_SIZE," (number->string (length global-table)) ");";TODO: *,length of word
-                   "PUSH(R0);"
-                   "\n"
-                   "CALL(MALLOC);"
-                   "\n"
-                   "MOV(RG,R0);";TODO: in arch.h to add register RG (global)
-                   )
+;labtc - labale to code
+(define labtc
+  (lambda (lab)
+    (set! CODE (sa CODE lab ":" (string #\newline)))
     ))
+
 
 (define lab-construct
   (let ((index (box 0)))
@@ -2155,72 +2139,396 @@ done))
       (begin (set-box! index (+ 1 (unbox index)))
              (string-append s (number->string (unbox index))))
       )))
+
+(define mov
+  (lambda (to from)
+    (sa "MOV(" to "," from ")")
+    ))
+
+(define imm
+  (lambda (i)
+    (sa "IMM(" i ")")
+    ))
+
+(define ind
+  (lambda (add)
+    (sa "IND(" add ")")
+    ))
+
+(define indd
+  (lambda (add1 add2)
+    (sa "INDD(" add1 "," add2 ")")
+    ))
+
+(define cmp
+  (lambda (obj1 obj2)
+    (sa "CMP(" obj1 "," obj2 ")")
+    ))
+
+(define jmp
+  (lambda (lab)
+    (sa "JUMP(" lab ")")
+    ))
+
+(define jmp-eq
+  (lambda (lab)
+    (sa "JUMP_EQ(" lab ")")
+    ))
+
+(define jmp-ne
+  (lambda (lab)
+    (sa "JUMP_NE(" lab ")")
+    ))
+
+(define push
+  (lambda (what)
+    (sa "PUSH(" what ")")
+    ))
+
+(define call
+  (lambda (proc)
+    (sa "CALL(" proc ")")
+    ))
+
+(define drop
+  (lambda (count)
+    (sa "DROP(" count ")")
+    ))
+
+(define pop
+  (lambda (reg)
+    (sa "POP(" reg ")")
+    ))
+
+(define fparg
+  (lambda (i)
+    (sa "FPARG(" i ")")
+    ))
+
+(define sub
+  (lambda (dest src)
+    (sa "SUB(" dest "," src ")")
+    ))
+
+(define add
+  (lambda (dest src)
+    (sa "ADD(" dest "," src ")")
+    ))
+
+(define div
+  (lambda (dest src)
+    (sa "DIV(" dest "," src ")")
+    ))
+
+(define MUL
+  (lambda (dest src)
+    (sa "MUL(" dest "," src ")")
+    ))
+
+(define rem
+  (lambda (dest src)
+    (sa "REM(" dest "," src ")")
+    ))
+
+(define decr
+  (lambda (dest)
+    (sa "DECR(" dest ")")
+    ))
+
+(define incr
+  (lambda (dest)
+    (sa "INCR(" dest ")")
+    ))
+
+(define malloc
+  (lambda (size to)
+    (ltc (push size))
+    (ltc (call "malloc"))
+    (ltc (drop "1"))
+    (ltc (mov to "R0"))
+    ))
+
+(define for
+  (lambda (i do)
+    (let ((exit-loop (lab-construct "FOR_EXIT_"))
+          (start-loop (lab-construct "FOR_START_")))
+      (ltc (mov "R10" i))
+      (labtc start-loop)
+      (ltc (cmp "R2" "0"))
+      (ltc (jmp-eq exit-loop))
+      (ltc (push "R10"))
+      (do)
+      (ltc (pop "R10"))
+      (ltc (decr "R10"))
+      (ltc (jmp start-loop))
+      (labtc exit-loop))
+    ))
+
+;------------------------------------tables-------------------------------------------------------
+
+;------------------------global-table
+(define global-table (list))
+(define next-free-global 0)
+
+(define make-global-table-find
+  (lambda (code)
+    (cond ((or (not (pair? code)) (null? code)) '())
+          ((equal? (car code) 'fvar) 
+           (if (not (member (cadr code) (map cadr global-table)))
+               (begin (set! global-table (cons (list next-free-global (cadr code)) global-table))
+                      (set! next-free-global (+ 1 next-free-global)))))
+          (else (begin (make-global-table-find (car code)) (make-global-table-find (cdr code)))))
+    ))
+
+(define make-global-table
+  (lambda (code)
+    (begin (make-global-table-find code)
+           (set! global-table (sort (lambda (first sec) (< (car first) (car sec))) global-table)))
+    ))
+
+(define lookup-global-help
+  (lambda (key table)
+    (cond ((null? table) "ERROR: NOT IN GLOBAL TABLE")
+          ((equal? key (cadar table)) (caar table))
+          (else (lookup-global-help key (cdr table))))
+    ))
+
+(define lookup-global
+  (lambda (key)
+    (number->string (lookup-global-help key global-table))
+    ))
+
+(define gen-fvar
+  (lambda (pe)
+    (ltc (mov "R0" (lookup-global (cadr pe))))
+    ))
+
+(define set-fvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov (lookup-global (cadr (cadr pe))) "R0"))
+    (ltc (mov "R0" "VOID")) ;TODO: void
+    ))
+
+(define def-fvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov (lookup-global (cadr (cadr pe))) "R0"))
+    (ltc (mov "R0" "VOID")) ;TODO: void
+    ))
+  
+  
+
+
+;-----------------------const-table
+(define find-const-in-code
+  (lambda (code)
+    (cond ((or (not (pair? code)) (null? code)) '())
+          ((equal? (car code) 'const) (cadr code))
+          (else `((find-const-in-code (car code)) ,@(find-const-in-code (cdr code))))) ; NOT GOOD!
+    ))
+
+(define delete-dup
+  (lambda (e)
+    (if (or (null? e) (null? (cdr e))) e
+        (if (member (car e) (cdr e)) (delete-dup (cdr e))
+            (cons (car e) (delete-dup (cdr e)))))))
+
+(define type-const
+  (lambda (e)
+    (cond
+      ((or (char? e) (number? e) (string? e) (null? e) (boolean? e)) `(,e)); was void?
+      ((pair? e)
+       `(,e ,@(type-const (car e)) ,@(type-const (cdr e))))
+       ((vector? e)
+        `(,e ,@(apply append
+                      (map type-const
+                           (vector->list e)))))
+       ((symbol? e)
+        `(,e ,@(type-const (symbol->string e))))
+       (else (type-const (cdr e)))
+       )))
+
+(define const-lookup
+  (lambda (val const-table)
+    (cond
+      ((null? const-table) '())
+      ((equal? val (caar const-table)) (cadar const-table))
+      (else (const-lookup val (cdr const-table))))))
+
+(define const-lookup-vector
+  (lambda (const-table)
+    (lambda (vector-ref)
+      (const-lookup vector-ref const-table))))
+;(define const-lookup
+;  (lambda (val const-table)
+;   (display "{") (display "val: ") (display val) (display " ") (display "const-table: ") (display const-table) (display "}")))
+        
+
+
+(define make-tagged-offset2 ; todo complete for all types
+  (lambda (list_of_consts offset const-table)
+    (if (null? list_of_consts)
+        '()
+        (let ((first (car list_of_consts))
+              (remainder (cdr list_of_consts)))
+          (cond
+            ((null? first)
+             (append const-table `(,first ,offset (T_nil)) (make-tagged-offset remainder (+ 1 offset) const-table)))
+            ((number? first)
+             (append const-table `(,first ,offset (T_int ,first)) (make-tagged-offset remainder (+ 2 offset) const-table))))
+            ((pair? first)
+             (append const-table `(,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table))) (make-tagged-offset remainder (+ 3) const-table)))))))
+
+
+(define make-tagged-offset ; todo complete for all types
+  (lambda (const offset const-table)
+    (if (null? const)
+        const-table
+        (let ((first (car const))
+              (remainder (cdr const)))
+          (cond
+            ((null? first)
+             (make-tagged-offset remainder (+ 1 offset) (append const-table `((,first ,offset (T_nil))))))
+            ((and (number? first) (integer? first))
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_int ,first))))))
+            ((and (number? first) (not (integer? first)))
+             (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_frac ,(numerator first) ,(denominator first)))))))
+            ((char? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_char ,first))))))
+            ((string? first)
+             (make-tagged-offset remainder (+ 2 (string-length first) offset) (append const-table `((,first ,offset (T_string ,(string-length first) ,@(string->list first)))))))
+            ((symbol? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_symbol  ,(const-lookup (symbol->string first) const-table)))))))
+            ((vector? first)
+             (make-tagged-offset remainder (+ 3 (vector-length first) offset) (append const-table `((,first ,offset (T_vector ,(vector-map (const-lookup-vector const-table) first)))))))
+            ((pair? first)
+             (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table))))))))))))
+      
+              
+
+(define  get-list-of-consts
+  (lambda (code list-of-consts)
+    (cond ((null? code) list-of-consts)
+          ((list? (car code)) (append list-of-consts (get-list-of-consts (car code)(list)) (get-list-of-consts (cdr code) (list))))
+          ((equal? (car code) 'const) (append list-of-consts (cdr code)))
+          (else (append list-of-consts (get-list-of-consts (cdr code) (list)))))))
+
+(define make-const-table
+  (lambda (code)
+    (let ((list-of-consts (get-list-of-consts code (list))))
+      (make-tagged-offset (reverse (delete-dup (type-const list-of-consts))) 0 (list)))))
+           
+           
+
+
+
+;------------------------------------code gen-------------------------------------------------------------
+(define code-gen 1)
+
+
     
 
-
-(define gen-const
-  (lambda (le)
-    (begin (set! const-place (find-const (cadr pe)))
-           "MOV(R0, );");TODO!
-    ))
 
 (define gen-if3
     (lambda (pe)
       (begin (define lab-else (lab-construct "L_if3_else_"))
              (define lab-exit (lab-construct "L_if3_exit_"))
-             (string-append (code-gen (cadr pe))
-                            "CMP(R0, IMM(SOB_FALSE));"
-                            "\n"
-                            "JUMP_EQ(" lab-else ");"
-                            "\n"
-                            (code-gen (caddr pe))
-                            "JUMP(" lab-exit ");"
-                            "\n"
-                            lab-else ":"
-                            "\n"
-                            (code-gen (cadddr pe))
-                            lab-exit ":"
-                            "\n"))
-      ))
-
-(define gen-or-list
-  (lambda (pe lab)
-    (string-append (code-gen pe)
-                   "CMP(R0, IMM(SOB_TRUE));"
-                   "\n"
-                   "JUMP_EQ(" lab ");"
-                   "\n")
-    ))
+             (code-gen (cadr pe))
+             ;(ltc (cmp "R0" "FALSE")) ;TODO: change to false
+             ;(ltc (jmp-eq lab-else))
+             (code-gen (caddr pe))
+             (ltc (jmp lab-exit))
+             (labtc lab-else)
+             (code-gen (caddr (cdr pe)))
+             (labtc lab-exit)
+             )))
   
-
 (define gen-or
+    (lambda (pe)
+      (begin (define lab-exit (lab-construct "L_or_exit_"))
+             (map-in-order
+              (lambda (l)
+                (begin (code-gen l)
+                       (ltc (cmp "R0" "FALSE")) ;TODO: change to false
+                       (ltc (jmp-ne lab-exit)))) (cadr pe))
+             (labtc lab-exit)
+             )))
+
+(define gen-applic
   (lambda (pe)
-    (begin (define lab-exit-or (lab-construct "L_or_exit_"))
-           (string-append (fold-left string-append "" (map (lambda (x) (gen-or-list x lab-exit-or)) (cadr pe)))
-                          lab-exit-or ":" "\n"))
+    (begin (map-in-order
+              (lambda (l)
+                (begin (code-gen l)
+                       (ltc (push "R0"))))
+                       (reverse (caddr pe)))
+            (ltc (push (imm (ns (length (caddr pe))))))
+            (code-gen (cadr pe))
+            ;(ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
+            ;(ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
+            (ltc (sa (push (indd "R0" "1")) "/*env*/"))
+            (ltc (call (indd "R0" "2")))
+            (ltc (drop "1"))
+            (ltc (pop "R1"))
+            (ltc (drop "R1"))
+            )))
+
+(define major 0)
+
+(define gen-lambda-simple
+  (lambda (pe)
+    (ltc (mov "R1" (fparg "0")))
+    (malloc (ns (+ 1 major)) "R2")
+    (ltc (mov "R4" (ns 0)))
+    (ltc (mov "R5" (ns 1)))
+    (for (ns major)
+      (lambda () (begin (ltc (mov "R6" (indd "R1" "R4")))
+                        (ltc (mov (indd "R2" "R5") "R6"))
+                        (ltc (incr "R4"))
+                        (ltc (incr "R5")))))
+    (ltc (mov "R3" (fparg "1")))
+    (malloc "R3" (indd "R2" "0"))
+    (ltc (mov "R4" (ns 0)))
+    (ltc (mov "R5" (ns 2)))
+    (ltc (mov "R7" (indd "R2" "0")))
+    (for "R3"
+      (lambda ()
+        (begin (ltc (mov "R6" (fparg "R5")))
+               (ltc (mov (indd "R7" "R4") "R6"))
+               (ltc (incr "R5"))
+               (ltc (incr "R4")))))
+    (malloc "3" "R0")
+    (ltc (mov (indd "R0" "0") (imm (ns -12))));TODO: change to closure
+    (ltc (mov (indd "R0" "1") "R2"))
+    (set! body-leb (lab-construct "CLOS_BODY_"))
+    (set! exit-clos-leb (lab-construct "EXIT_CLOS_"))
+    (ltc (mov (indd "R0" "2") body-leb))
+    (ltc (jmp exit-clos-leb))
+
+    (labtc body-leb)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))
+    ;(ltc (cmp (fparg "1") (ns (length (cadr pe)))))
+    ;(ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+    (set! major (+ 1  major))
+    (code-gen (caddr pe))
+    (set! major (- 1 major))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    (labtc exit-clos-leb)))
+    
+            
+
+(define gen-def
+  (lambda (pe)
+    (cond ((equal? 'fvar (caadr pe)) (def-fvar pe))
+          (else "NOT IMPL")) ;TODO
     ))
 
-
-(define gen-seq
+(define gen-set
   (lambda (pe)
-    (fold-left string-append "" (map code-gen (cadr pe)))
-    ))
-
-(define list-index
-        (lambda (e lst)
-          (if (eq? (car lst) e)
-              0
-              (+ 1 (list-index e (cdr lst))))
-          ))
-
-(define gen-fvar ;good only for get
-  (lambda (pe)
-    (string-append "*(WORD_SIZE," (number->string (list-index (cadr pe) global-table)) ");"
-                   "\n"
-                   "+(RG, R0);"
-                   "\n"
-                   "MOV(R0,IND(R0));"
-                   "\n")
+    (cond ((equal? 'fvar (caadr pe)) (set-fvar pe))
+          (else "NOT IMPL")) ;TODO
     ))
   
 
@@ -2228,39 +2536,27 @@ done))
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
+          ((equal? 'fvar (car pe)) (gen-fvar pe))
+          ((equal? 'def (car pe)) (gen-def pe)) 
+          ((equal? 'set (car pe)) (gen-set pe))
+          ((equal? 'seq (car pe)) (map-in-order code-gen (cadr pe)))
           ((equal? 'if3 (car pe)) (gen-if3 pe))
-          ((equal? 'seq (car pe)) (gen-seq pe))
           ((equal? 'or (car pe)) (gen-or pe))
-          ((equal? 'const (car pe)) (gen-const pe)) ;TODO
-          ((equal? 'fvar (car pe)) (gen-fvar pe)) ;good only for get
+          ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
+          ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
+
+          ((equal? 'const (car pe)) (ltc (mov "R0" (ns (cadr pe))))) ;TODO
+
+          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
+          
           ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
           ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
-          ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
-          ((equal? 'def (car pe)) (gen-def pe)) ;TODO
-          ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
           ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
 
-          (else (string-append (code-gen (car pe)) "\n" (fold-left string-append "" (code-gen (cdr pe))))))
+          (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
-
-
-(define code-gen-first
-  (lambda (pe)
-    (string-append (global-table-gen)
-                   ;TODO: apliog
-                   (code-gen pe)
-                   ;TODOL prolog
-                   )
-    ))
-
-
-
-
-
-
-
 
 
 
@@ -2284,36 +2580,58 @@ done))
         (list->string
          (run))))))
 
-(define list->file
-  (lambda (l out-file)
-    (let ((out-port (open-output-file out-file)))
+(define string->file
+  (lambda (str out-file)
+    (if (file-exists? out-file) (delete-file out-file))
+    (let ((out-port (open-output-file out-file))
+          (l (string->list str)))
       (letrec ((run
                 (lambda (ls)
                     (if (not (null? ls))
                         (begin
-                          (write (car ls) out-port)
-                          (newline out-port)
+                          (write-char (car ls) out-port)
                           (run (cdr ls)))
                         (close-output-port out-port)))))
          (run l)))
     ))
+(define string->sexpr
+  (lambda (str)
+    (<sexpr> (string->list str)
+             (lambda (e s)
+              (list e (list->string s)))
+            (lambda (klum) (display `(ERROR SEXPR))))
+    ))
+
+(define make-sexpes
+  (lambda (str)
+    (letrec ((run (lambda (slst rest)
+                     (if (eq? rest "") slst
+                         (let ((parsed (string->sexpr rest)))
+                           (run (append slst (list (car parsed))) (cadr parsed)))))))
+      (run '() str))
+    ))
+
+(define parse-manipulate
+  (lambda (sexps)
+    ;(annotate-tc TODO
+     (pe->lex-pe
+      (box-set 
+       (remove-applic-lambda-nil
+        (eliminate-nested-defines
+         (parse sexps)))));)
+    ))
 
 (define compile-scheme-file
   (lambda (in-file out-file)
-    (begin (set! string-in (file->string in-file))
-           (set! sexpes (test-string <sexpr> string-in))
-           (set! parsed (parse (cadar sexpes)))
-           (set! manipulated (annotate-tc 
-                              (pe->lex-pe
-                               (box-set 
-                                (remove-applic-lambda-nil
-                                 (eliminate-nested-defines parsed))))))
+    (begin (set! string-in (file->string in-file)) ;V
+           (set! sexpes (make-sexpes string-in)) ;V
+           (set! manipulated (if (= 1 (length sexpes)) (parse-manipulate sexpes)
+                                 (map parse-manipulate sexpes))) ;V
+           (set! CODE (sa CODE (file->string "prolog.c")))
            (make-global-table manipulated)
-           (make-const-table manipulated)
-           (set! genarated (code-gen-first manipulated))
-           (list->file genarated out-file);TODO: should be string to file
+           ;(make-const-table manipulated)
+           (code-gen manipulated)
+           (set! CODE (sa CODE (file->string "epilog.c")))
+           (string->file CODE out-file) ;V
+           manipulated
            )))
-
-
-
-
