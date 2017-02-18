@@ -2321,6 +2321,8 @@ done))
 
 
 ;-----------------------const-table
+(define const-table (list))
+
 (define find-const-in-code
   (lambda (code)
     (cond ((or (not (pair? code)) (null? code)) '())
@@ -2359,11 +2361,7 @@ done))
 (define const-lookup-vector
   (lambda (const-table)
     (lambda (vector-ref)
-      (const-lookup vector-ref const-table))))
-;(define const-lookup
-;  (lambda (val const-table)
-;   (display "{") (display "val: ") (display val) (display " ") (display "const-table: ") (display const-table) (display "}")))
-        
+      (const-lookup vector-ref const-table))))     
 
 
 (define make-tagged-offset2 ; todo complete for all types
@@ -2381,7 +2379,7 @@ done))
              (append const-table `(,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table))) (make-tagged-offset remainder (+ 3) const-table)))))))
 
 
-(define make-tagged-offset ; todo complete for all types
+(define make-tagged-offset2 ; todo complete for all types
   (lambda (const offset const-table)
     (if (null? const)
         const-table
@@ -2405,7 +2403,34 @@ done))
             ((pair? first)
              (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table))))))))))))
       
-              
+(define make-tagged-offset ; todo complete for all types
+  (lambda (const offset const-table)
+    (if (null? const)
+        const-table
+        (let ((first (car const))
+              (remainder (cdr const)))
+          (cond
+            ((null? first)
+             (make-tagged-offset remainder (+ 1 offset) (append const-table `((,first ,offset (T_nil))))))
+            ((void? first)
+             (make-tagged-offset remainder (+ 1 offset) (append const-table `((,first ,offset (T_void))))))
+            ((boolean? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_bool ,first))))))
+            ((and (number? first) (integer? first))
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_integer ,first))))))
+            ((and (number? first) (not (integer? first)))
+             (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_frac ,(numerator first) ,(denominator first)))))))
+            ((char? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_char ,first))))))
+            ((string? first)
+             (make-tagged-offset remainder (+ 2 (string-length first) offset) (append const-table `((,first ,offset (T_string ,(string-length first) ,@(string->list first)))))))
+            ((symbol? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_symbol  ,(const-lookup (symbol->string first) const-table)))))))
+            ((vector? first)
+             (make-tagged-offset remainder (+ 3 (vector-length first) offset) (append const-table `((,first ,offset (T_vector ,(vector-map (const-lookup-vector const-table) first)))))))
+            ((pair? first)
+             (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table))))))))))))
+
 
 (define  get-list-of-consts
   (lambda (code list-of-consts)
@@ -2415,12 +2440,24 @@ done))
           (else (append list-of-consts (get-list-of-consts (cdr code) (list)))))))
 
 (define make-const-table
-  (lambda (code)
+  (lambda (code memory-location)
     (let ((list-of-consts (get-list-of-consts code (list))))
-      (make-tagged-offset (reverse (delete-dup (type-const list-of-consts))) 0 (list)))))
+      (begin
+        (set! const-table (make-tagged-offset (reverse (delete-dup (type-const list-of-consts))) memory-location (list)))
+        const-table))))
            
            
-
+(define gen-const-table
+  (lambda (const-table out-code)
+    (let* ((first (car const-table))
+          (rest (cdr const-table))
+          (type (caddr first))
+          (value (cdaddr first)))
+    (cond ((equal? type 'T_nil) (gen-make-sob-nil))
+          ((equal? type 'T_void) (gen-make-sob-void))
+          ((equal? type 'T_bool) (gen-make-sob-bool (car value)))
+          (equal? type 'T ))))
+                                 
 
 
 ;------------------------------------code gen-------------------------------------------------------------
