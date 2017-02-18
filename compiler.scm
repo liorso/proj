@@ -2433,6 +2433,15 @@ done))
   (lambda (pe)
     (ltc (mov "R0" (fparg (ns (+ 2 (caddr pe))))))
     ))
+
+(define gen-bvar
+  (lambda (pe)
+    (let ((major (ns (caddr pe)))
+          (minor (ns (cadddr pe))))
+      (ltc (mov "R0" (fparg "0")))
+      (ltc (mov "R0" (indd "R0" major)))
+      (ltc (mov "R0" (indd "R0" minor)))
+      )))
     
             
 
@@ -2454,15 +2463,15 @@ done))
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
           ((equal? 'fvar (car pe)) (gen-fvar pe))
-          ((equal? 'def (car pe)) (gen-def pe)) 
-          ((equal? 'set (car pe)) (gen-set pe))
+          ((equal? 'def (car pe)) (gen-def pe)) ;TODO
+          ((equal? 'set (car pe)) (gen-set pe)) ;TODO
           ((equal? 'seq (car pe)) (map-in-order code-gen (cadr pe)))
           ((equal? 'if3 (car pe)) (gen-if3 pe))
           ((equal? 'or (car pe)) (gen-or pe))
-          ((equal? 'applic (car pe)) (gen-applic pe)) ;TODO
-          ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe)) ;TODO
-          ((equal? 'pvar (car pe)) (gen-pvar pe)) ;TODO
-
+          ((equal? 'applic (car pe)) (gen-applic pe))
+          ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe))
+          ((equal? 'pvar (car pe)) (gen-pvar pe))
+          ((equal? 'bvar (car pe)) (gen-bvar pe))
 
           ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
                                            (ltc (call "MAKE_SOB_INTEGER"))
@@ -2471,7 +2480,6 @@ done))
 
           (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           
-          ((equal? 'bvar (car pe)) (gen-bvar pe)) ;TODO
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
           ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
