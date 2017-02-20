@@ -34,7 +34,9 @@
   TRANS(R2, type1); TRANS(R3, type2);                                               \
   printf("R2 = %-10s R3 = %s\n", type1, type2);                                     \
   TRANS(R4, type1); TRANS(R5, type2);                                               \
-  printf("R4 = %-10s R5 = %s\n\n", type1, type2);                                   \
+  printf("R4 = %-10s R5 = %-10s\n", type1, type2);                                   \
+  TRANS(R13, type1); TRANS(R15, type2);                                               \
+  printf("R13 = %-10s R15 = %-10s\n\n", type1, type2);                                   \
   printf("----------------------------\n");                                         \
   printf("Stack Info:\n");                                                          \
   printf("----------------------------\n");                                         \

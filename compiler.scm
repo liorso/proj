@@ -2180,6 +2180,11 @@ done))
     (sa "JUMP_NE(" lab ")")
     ))
 
+(define jmp-le
+  (lambda (lab)
+    (sa "JUMP_LE(" lab ")")
+    ))
+
 (define push
   (lambda (what)
     (sa "PUSH(" what ")")
@@ -2188,6 +2193,11 @@ done))
 (define call
   (lambda (proc)
     (sa "CALL(" proc ")")
+    ))
+
+(define calla
+  (lambda (proc)
+    (sa "CALLA(" proc ")")
     ))
 
 (define drop
@@ -2205,6 +2215,11 @@ done))
     (sa "FPARG(" i ")")
     ))
 
+(define stack
+  (lambda (i)
+    (sa "STACK(" i ")")
+    ))
+
 (define sub
   (lambda (dest src)
     (sa "SUB(" dest "," src ")")
@@ -2220,7 +2235,7 @@ done))
     (sa "DIV(" dest "," src ")")
     ))
 
-(define MUL
+(define mul
   (lambda (dest src)
     (sa "MUL(" dest "," src ")")
     ))
@@ -2257,6 +2272,7 @@ done))
   (lambda (i do)
     (let ((exit-loop (lab-construct "FOR_EXIT_"))
           (start-loop (lab-construct "FOR_START_")))
+      (ltc (push "R10"))
       (ltc (mov "R10" i))
       (labtc start-loop)
       (ltc (cmp "R10" "0"))
@@ -2266,8 +2282,9 @@ done))
       (ltc (pop "R10"))
       (ltc (decr "R10"))
       (ltc (jmp start-loop))
-      (labtc exit-loop))
-    ))
+      (labtc exit-loop)
+      (ltc (pop "R10"))  
+    )))
 
 ;------------------------------------tables-------------------------------------------------------
 
@@ -2507,7 +2524,7 @@ done))
             ;(ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
             ;(ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
             (ltc (sa (push (indd "R0" "1")) "/*env*/"))
-            (ltc (call (sa "*" (indd "R0" "2"))))
+            (ltc (calla (indd "R0" "2")))
             (ltc (drop "1"))
             (ltc (pop "R1"))
             (ltc (drop "R1"))
@@ -2519,7 +2536,7 @@ done))
   (lambda (pe)
     (let ((body-leb (lab-construct "CLOS_BODY_"))
           (exit-clos-leb (lab-construct "EXIT_CLOS_")))
-      (begin 
+      (begin
         (ltc (mov "R1" (fparg "0")))
         (malloc (ns (+ 1 major)) "R2")
         (ltc (mov "R4" (ns 0)))
@@ -2558,7 +2575,158 @@ done))
         (ltc "RETURN")
         (labtc exit-clos-leb)))
     ))
-    
+
+(define gen-lambda-opt
+  (lambda (pe)
+    (let ((body-leb (lab-construct "CLOS_BODY_OPT_"))
+          (exit-clos-leb (lab-construct "EXIT_CLOS_OPT_")))
+      (begin 
+        (ltc (mov "R1" (fparg "0")))
+        (malloc (ns (+ 1 major)) "R2")
+        (ltc (mov "R4" (ns 0)))
+        (ltc (mov "R5" (ns 1)))
+        (for (ns major)
+          (lambda () (begin (ltc (mov "R6" (indd "R1" "R4")))
+                            (ltc (mov (indd "R2" "R5") "R6"))
+                            (ltc (incr "R4"))
+                            (ltc (incr "R5")))))
+        (ltc (mov "R3" (fparg "1")))
+        (malloc "R3" (indd "R2" "0"))
+        (ltc (mov "R4" (ns 0)))
+        (ltc (mov "R5" (ns 2)))
+        (ltc (mov "R7" (indd "R2" "0")))
+        (for "R3"
+          (lambda ()
+            (begin (ltc (mov "R6" (fparg "R5")))
+                   (ltc (mov (indd "R7" "R4") "R6"))
+                   (ltc (incr "R5"))
+                   (ltc (incr "R4")))))
+        (malloc "3" "R0")
+        ;(ltc (mov (indd "R0" "0") (imm (ns -22))));TODO: change to closure
+        (ltc (mov (indd "R0" "1") "R2"))
+        (ltc (mov (indd "R0" "2") (lab body-leb)))
+        (ltc (jmp exit-clos-leb))
+        
+        (labtc body-leb)
+        (ltc (push "FP"))
+        (ltc (mov "FP" "SP"))
+        ;Stack fix
+        (let ((lab-exact-args (lab-construct "OPT_EXACT_ARGS_"))
+              (lab-exit-stack-fix (lab-construct "EXIT_STACK_FIX_"))
+              (list-length (length (cadr pe))))
+          (begin (ltc (cmp (fparg "1") (ns (length (cadr pe)))))
+                 (ltc (jmp-eq lab-exact-args))
+                 (ltc (push "R1"))
+                 (ltc (push "R2"))
+                 (ltc (push "R3"))
+                 (ltc (mov "R1" SOB_NIL)) ;TODO NIL
+                 (ltc (mov "R2" (fparg "1")))
+                 (ltc (sub "R2" (ns list-length)))
+                 (ltc (mov "R3" (fparg "1"))) ;TODO maybe IMM(FPARG...!!!!!
+                 (ltc (add "R3" "2"))
+                 (for "R2"
+                   (lambda ()
+                     (ltc (mov "R1" (cons (fparg "R3") "R1"))) ;TODO maybe IMM(FPARG...!!!!!
+                     (ltc (decr "R3"))))
+                 (ltc (mov (fparg (ns (+ 2 list-length))) "R1"))
+                 (ltc (pop "R3"))
+                 (ltc (pop "R2"))
+                 (ltc (pop "R1"))
+                 (ltc (jmp exit-clos-leb))
+
+                 (labtc lab-exact-args)
+                 (ltc (push "R2"))
+                 (ltc (push "R3"))
+                 (ltc (push "R4"))
+                 (ltc (mov "R2" (ns (+ 4 list-length))))
+                 (ltc (mov "R3" (ns -2)))
+                 (for "R2"
+                   (lambda () (begin (ltc (mov "R4" (fparg "R3")))
+                                     (ltc (decr "R3"))
+                                     (ltc (mov (fparg "R3") "R4"))
+                                     (ltc (incr "R3"))
+                                     (ltc (incr "R3"))
+                                     )))
+                 (ltc (mov (fparg (ns (+ 2 list-length))) "NIL")) ;TODO NIL!
+                 (ltc (pop "R4"))
+                 (ltc (pop "R3"))
+                 (ltc (pop "R2"))
+                 (labtc exit-clos-leb)
+                 (set! major (+ 1  major))
+                 (code-gen (caddr pe))
+                 (set! major (- 1 major))
+                 (ltc (pop "FP"))
+                 (ltc "RETURN")
+                 (labtc exit-clos-leb)))
+        ))))
+
+(define gen-applic-tc
+  (lambda (pe)
+    (let ((lab-sp-fixed (lab-construct "SP_FIXED_")))
+    (begin (ltc (cmp (fparg "1") (ns (length (caddr pe)))))
+           (ltc (jmp-le lab-sp-fixed))
+           ;moving local up if needed
+           ;(ltc (push "R1"))
+           ;(ltc (push "R2"))
+           ;(ltc (push "R3"))
+           ;(ltc (push "R4"))
+           ;(ltc (mov "R2" "SP"))
+           ;(ltc (sub "R2" "FP"))
+           ;(ltc (mov "R3" "SP"))
+           ;(ltc (decr "R3"))
+           ;(ltc (mov "R4" (ns (length (caddr pe)))))
+           ;(ltc (sub "R4" (fparg "1")))
+           ;(ltc (add "R4" "SP"))
+           ;(ltc (mov "SP" "R4"))
+           ;(ltc (decr "R4"))
+           ;(for "R2"
+           ;  (lambda () (begin (ltc (mov "R1" (ind "R3")))
+           ;                    (ltc (mov (ind "R4") "R1"))
+           ;                    (ltc (decr "R3"))
+           ;                    (ltc (decr "R4")))))
+           ;(ltc (pop "R4"))
+           ;(ltc (pop "R3"))
+           ;(ltc (pop "R2"))
+           ;(ltc (pop "R1"))
+
+           
+           (labtc lab-sp-fixed)
+           ;(ltc (mov "R13" (ns (length (caddr pe)))))
+           ;(ltc (sub "R13" (fparg "1")))
+           ;(ltc (add "R13" "SP"))
+           
+           (map-in-order
+            (lambda (l)
+              (begin (code-gen l)
+                     (ltc (push "R0"))))
+            (reverse (caddr pe)))
+           (ltc (push (imm (ns (length (caddr pe))))))
+           (code-gen (cadr pe))
+           ;(ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
+           ;(ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
+           (ltc (sa (push (indd "R0" "1")) "/*env*/"))
+           (ltc (push (fparg "-1")))
+           (ltc (mov "R1" (fparg "-2")))
+           (ltc (mov "R2" (ns (length (caddr pe)))))
+           (ltc (add "R2" "3"))
+           (ltc (mov "R3" "SP"))
+           (ltc (sub "R3" "3")) ;pushed env num of args and one
+           (ltc (sub "R3" (ns (length (caddr pe)))))
+           (ltc (mov "R4" "FP"))
+           (ltc (sub "R4" "4"))
+           (ltc (sub "R4" (fparg "1")))
+           (for "R2"
+             (lambda () (begin (ltc (mov "R5" (stack "R3")))                               
+                               (ltc (mov (stack "R4") "R5"))
+                               (ltc (incr "R3"))
+                               (ltc (incr "R4")))))
+           (ltc (mov "FP" "R1"))
+           (ltc (mov "SP" "R4"))
+           (ltc "INFO")
+           (ltc (jmp (sa "*" (indd "R0" "2"))))
+           ))))
+
+
 (define gen-pvar
   (lambda (pe)
     (ltc (mov "R0" (fparg (ns (+ 2 (caddr pe))))))
@@ -2602,8 +2770,10 @@ done))
           ((equal? 'or (car pe)) (gen-or pe))
           ((equal? 'applic (car pe)) (gen-applic pe))
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe))
+          ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'pvar (car pe)) (gen-pvar pe))
           ((equal? 'bvar (car pe)) (gen-bvar pe))
+          ((equal? 'tc-applic (car pe)) (gen-applic-tc pe)) ;TODO
 
           ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
                                            (ltc (call "MAKE_SOB_INTEGER"))
@@ -2613,8 +2783,7 @@ done))
           (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe)) ;TODO
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe)) ;TODO
-          ((equal? 'applic-tc (car pe)) (gen-applic-tc pe)) ;TODO
-
+          
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
 
@@ -2701,12 +2870,12 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    ;(annotate-tc TODO
+    (annotate-tc
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
         (eliminate-nested-defines
-         (parse sexps)))));)
+         (parse sexps))))))
     ))
 
 (define initial-params
