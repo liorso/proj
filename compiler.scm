@@ -2330,14 +2330,20 @@ done))
   (lambda (pe)
     (code-gen (caddr pe))
     (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
-    ;(ltc (mov "R0" "VOID")) ;TODO: void
+    (ltc (mov "R0" "VOID"))
+    ))
+
+(define get-box-fvar
+  (lambda (pe)
+    (ltc (mov "R0" (ind (lookup-global (cadr pe)))))
+    (ltc (mov "R0" (ind "R0")))
     ))
 
 (define def-fvar
   (lambda (pe)
     (code-gen (caddr pe))
     (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
-    ;(ltc (mov "R0" "VOID")) ;TODO: void
+    (ltc (mov "R0" "T_VOID"))
     ))
   
   
@@ -2391,8 +2397,8 @@ done))
                        (reverse (caddr pe)))
             (ltc (push (imm (ns (length (caddr pe))))))
             (code-gen (cadr pe))
-            ;(ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
-            ;(ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
+            (ltc (cmp (indd "R0" "0") "T_CLOSURE"))
+            (ltc (jmp-ne "NOT_CLOSURE"))
             (ltc (sa (push (indd "R0" "1")) "/*env*/"))
             (ltc (calla (indd "R0" "2")))
             (ltc (drop "1"))
@@ -2428,7 +2434,7 @@ done))
                    (ltc (incr "R5"))
                    (ltc (incr "R4")))))
         (malloc "3" "R0")
-        ;(ltc (mov (indd "R0" "0") (imm (ns -22))));TODO: change to closure
+        (ltc (mov (indd "R0" "0") "T_CLOSURE"))
         (ltc (mov (indd "R0" "1") "R2"))
         (ltc (mov (indd "R0" "2") (lab body-leb)))
         (ltc (jmp exit-clos-leb))
@@ -2436,8 +2442,8 @@ done))
         (labtc body-leb)
         (ltc (push "FP"))
         (ltc (mov "FP" "SP"))
-        ;(ltc (cmp (fparg "1") (ns (length (cadr pe)))))
-        ;(ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+        (ltc (cmp (fparg "1") (ns (length (cadr pe)))))
+        (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
         (set! major (+ 1  major))
         (code-gen (caddr pe))
         (set! major (- 1 major))
@@ -2472,7 +2478,7 @@ done))
                    (ltc (incr "R5"))
                    (ltc (incr "R4")))))
         (malloc "3" "R0")
-        ;(ltc (mov (indd "R0" "0") (imm (ns -22))));TODO: change to closure
+        (ltc (mov (indd "R0" "0") "TCLOSURE"))
         (ltc (mov (indd "R0" "1") "R2"))
         (ltc (mov (indd "R0" "2") (lab body-leb)))
         (ltc (jmp exit-clos-leb))
@@ -2503,7 +2509,7 @@ done))
                      (ltc (drop "2"))
                      (ltc (mov "R1" "R0"))
                      (ltc (decr "R3"))))
-                 (ltc (mov (fparg (ns (+ 2 list-length))) "R1"));maybe not FPARG
+                 (ltc (mov (fparg (ns (+ 2 list-length))) "R1"))
                  (ltc (pop "R3"))
                  (ltc (pop "R2"))
                  (ltc (pop "R1"))
@@ -2528,7 +2534,7 @@ done))
                  (ltc (incr "R2"))
                  (ltc (mov (fparg "1") "R2"))
                  (ltc (call "MAKE_SOB_NIL"))
-                 (ltc (mov (fparg (ns (+ 2 list-length))) "R0")) ;TODO NIL!
+                 (ltc (mov (fparg (ns (+ 2 list-length))) "R0"))
                  (ltc (pop "R4"))
                  (ltc (pop "R3"))
                  (ltc (pop "R2"))
@@ -2567,7 +2573,7 @@ done))
                    (ltc (incr "R5"))
                    (ltc (incr "R4")))))
         (malloc "3" "R0")
-        ;(ltc (mov (indd "R0" "0") (imm (ns -22))));TODO: change to closure
+        (ltc (mov (indd "R0" "0") "T_CLOSURE"))
         (ltc (mov (indd "R0" "1") "R2"))
         (ltc (mov (indd "R0" "2") (lab body-leb)))
         (ltc (jmp exit-clos-leb))
@@ -2598,7 +2604,7 @@ done))
                      (ltc (drop "2"))
                      (ltc (mov "R1" "R0"))
                      (ltc (decr "R3"))))
-                 (ltc (mov (fparg (ns (+ 2 list-length))) "R1"));maybe not FPARG
+                 (ltc (mov (fparg (ns (+ 2 list-length))) "R1"))
                  (ltc (pop "R3"))
                  (ltc (pop "R2"))
                  (ltc (pop "R1"))
@@ -2623,7 +2629,7 @@ done))
                  (ltc (incr "R2"))
                  (ltc (mov (fparg "1") "R2"))
                  (ltc (call "MAKE_SOB_NIL"))
-                 (ltc (mov (fparg (ns (+ 2 list-length))) "R0")) ;TODO NIL!
+                 (ltc (mov (fparg (ns (+ 2 list-length))) "R0"))
                  (ltc (pop "R4"))
                  (ltc (pop "R3"))
                  (ltc (pop "R2"))
@@ -2678,8 +2684,8 @@ done))
             (reverse (caddr pe)))
            (ltc (push (imm (ns (length (caddr pe))))))
            (code-gen (cadr pe))
-           ;(ltc (cmp (indd "R0" "0") "CLOUSRE")) ;TODO: closure
-           ;(ltc (jmp-ne "NOT_CLOSURE")) ;NOT CLOSURE
+           (ltc (cmp (indd "R0" "0") "T_CLOSURE"))
+           (ltc (jmp-ne "NOT_CLOSURE"))
            (ltc (sa (push (indd "R0" "1")) "/*env*/"))
            (ltc (push (fparg "-1")))
            (ltc (mov "R1" (fparg "-2")))
@@ -2724,13 +2730,32 @@ done))
           (else "NOT IMPL")) ;TODO
     ))
 
+(define set-pvar
+  (lambda (pe)
+    (begin (code-gen (caddr pe))
+           (ltc (mov (fparg (ns (+ 2 (caddr (cadr pe))))) "R0"))
+           (ltc (mov "R0" "T_VOID"))
+           )))
+
 (define gen-set
   (lambda (pe)
     (cond ((equal? 'fvar (caadr pe)) (set-fvar pe))
+          ((equal? 'pvar (caadr pe)) (set-pvar pe))
           (else "NOT IMPL")) ;TODO
     ))
   
+(define gen-box-get-pvar
+  (lambda (pe)
+    (begin (ltc (mov "R0" (fparg (ns (+ 2 (caddr (cadr pe)))))))
+           (ltc (mov "R0" (ind "R0")))
+           )))
 
+(define gen-box-get
+  (lambda (pe)
+    (cond ((equal? 'fvar (caadr pe)) (get-box-fvar pe))
+          ((equal? 'pvar (caadr pe)) (gen-box-get-pvar pe))
+          (else "NOT IMPL")) ;TODO
+    ))
 
 (define code-gen
   (lambda (pe)
@@ -2745,18 +2770,14 @@ done))
           ((equal? 'lambda-simple (car pe)) (gen-lambda-simple pe))
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe))   
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe))
-
+          ((equal? 'box-get (car pe)) (gen-box-get pe))
           ((equal? 'pvar (car pe)) (gen-pvar pe))
           ((equal? 'bvar (car pe)) (gen-bvar pe))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
 
           ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
                                            (ltc (call "MAKE_SOB_INTEGER"))
-                                           (ltc (drop (ns 1))))) ;TODO
-
-
-          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
-          
+                                           (ltc (drop (ns 1))))) ;TODO        
           
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
