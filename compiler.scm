@@ -2395,12 +2395,12 @@ done))
 (define make-tagged-offset ; todo complete for all types
   (lambda (const offset const-table)
     (begin
-;      (display "const:[")
-;      (display const)
-;      (display "offset:(")
-;      (display offset)
-;      (display ")")
-;      (display "]\n")
+      (display "raw-const:[")
+      (display const)
+      (display "offset:(")
+      (display offset)
+      (display ")")
+      (display "]\n")
       (if (null? const)
           const-table
           (let ((first (car const))
@@ -2422,7 +2422,7 @@ done))
                   ((symbol? first)
                    (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_symbol  ,(const-lookup (symbol->string first) const-table)))))))
                   ((vector? first)
-                   (make-tagged-offset remainder (+ 2 (vector-length first) offset) (append const-table `((,first ,offset (T_vector ,(vector-length first) ,(vector->list (vector-map (const-lookup-vector const-table) first))))))))
+                   (make-tagged-offset remainder (+ 2 (vector-length first) offset) (append const-table `((,first ,offset (T_vector ,(vector-length first) ,@(vector->list (vector-map (const-lookup-vector const-table) first))))))))
                   ((pair? first)
                    (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table)))))))))))))
 
@@ -2439,10 +2439,6 @@ done))
 
 
 
-(define map-make-tagged-offset-caller
-  (lambda (x)
-    (make-tagged-offset (reverse (delete-dup (type-const x))) const-table-mem-location (list))))
-
 
 (define make-const-table-2
   (lambda (code memory-location)
@@ -2450,9 +2446,9 @@ done))
       (begin
         ;(display ":")
         ;(display code)
-        ;(display ":vector:")
-        ;(display vector-of-consts)
-        ;(display ":;\n")
+        (display ":vector:")
+        (display vector-of-consts)
+        (display ":;\n")
         (set! const-table (make-tagged-offset (reverse (delete-dup (type-const vector-of-consts))) memory-location (list)))
         ;(set! const-table (map-in-order map-make-tagged-offset-caller list-of-consts))
         ;(display (make-tagged-offset (reverse (delete-dup (type-const list-of-consts))) memory-location (list)))
@@ -2468,30 +2464,36 @@ done))
 
            
 (define gen-const-table
-  (lambda (const-table)
-    (begin
-      (display "ct11")
-      (display const-table)
-      (display "ct11;"))
-    (let* ((first (car const-table))
-          (rest (cdr const-table))
-          (type (caddr first))
-          (value (cdddr first)))
-      ;(display "first: ")
-      ;(display first)
-      ;(display ";")
-      ;(display "type: ")
-      ;(display type)
-      ;(display ";")
-      ;(display "value: ")
-      ;(display value)
-      ;(display ";")
-    (cond ((equal? type 'T_nil) (gen-make-sob-nil))
-          ((equal? type 'T_void) (gen-make-sob-void))
-          ((equal? type 'T_bool) (gen-make-sob-bool (car value)))
-          ((equal? type 'T_integer) (gen-make-sob-integer (car value)))
-          ((equal? type 'T_char) (gen-make-sob-char (car value)))
-          ((equal? type 'T_pair) (gen-make-sob-pair (value)))))))
+  (lambda (const-table-local)
+    (if (not (null? const-table-local)) 
+        (begin
+          (display "ct[")
+          (display const-table-local)
+          (display "]")
+          (let* ((first (car const-table-local))
+                 (rest (cdr const-table-local))
+                 (type (caaddr first))
+                 (value (reverse(cdr(caddr first)))))
+            (display "first: ")
+            (display first)
+            (display ";")
+            (display "type: ")
+            (display type)
+            (display ";")
+            (display "value: ")
+            (display value)
+            (display ";\n")
+            (cond ((equal? type 'T_nil) (gen-make-sob-nil))
+                  ((equal? type 'T_void) (gen-make-sob-void))
+                  ((equal? type 'T_bool) (gen-make-sob-bool value))
+                  ((equal? type 'T_integer) (gen-make-sob-integer value))
+                  ((equal? type 'T_fraction) (gen-make-sob-fraction value))
+                  ((equal? type 'T_char) (gen-make-sob-char value))
+                  ((equal? type 'T_string) (gen-make-sob-string value))
+                  ((equal? type 'T_symbol) (gen-make-sob-symbol value))
+                  ((equal? type 'T_vector) (gen-make-sob-vector value))
+                  ((equal? type 'T_pair) (gen-make-sob-pair value)))
+            (gen-const-table rest))))))
 
     
 (define const-table-mem-location 1)
@@ -2513,8 +2515,11 @@ done))
 (define gen-make-sob-bool
   (lambda (value)
     (display "bool\n")
-    (begin (ltc (push (imm  (bool->string (car value)))))
-           (ltc (call "MAKE_SOB_BOOL")))))
+    (if (car value)
+        (begin (ltc (push (imm  (ns 1))))
+               (ltc (call "MAKE_SOB_BOOL")))
+        (begin (ltc (push (imm  (ns 0))))
+               (ltc (call "MAKE_SOB_BOOL"))))))
 
 (define gen-make-sob-integer
   (lambda (value)
@@ -2540,21 +2545,22 @@ done))
 (define gen-make-sob-string
   (lambda (value)
     (display "string\n")
-    (begin (map (lambda (x) (ltc (push (imm (char->string x))))) (cadr value)) ;;string
-           (ltc (push (imm  (number->string (car value))))) ;;size
-           (ltc (call "MAKE_SOB_STRING")))))
+    (let ((reversed (reverse value)))
+      (begin (map-in-order (lambda (x) (ltc (push (imm (ns(char->integer x)))))) (reverse(cdr reversed))) ;;string
+             (ltc (push (imm  (ns (car reversed))))) ;;size
+             (ltc (call "MAKE_SOB_STRING"))))))
 
 (define gen-make-sob-symbol
   (lambda (value)
     (display "symbol\n")
-    (begin (ltc (push (imm (number->string (car value)))))  ;;string address
+    (begin (ltc (push (imm (ns (car value)))))  ;;string address
            (ltc (call "MAKE_SOB_SYMBOL")))))
 
 (define gen-make-sob-vector
   (lambda (value)
     (display "vector\n")
-    (begin  (map (lambda (x) (ltc (push (imm (number->string x))))) (cadr value)) ;;list of addresses
-            (ltc (push (imm  (number->string (car value))))) ;;size
+    (begin  (map-in-order (lambda (x) (ltc (push (imm (ns x))))) value) ;;list of addresses + size
+            ;(ltc (push (imm  (ns (car value))))) ;;size
             (ltc (call "MAKE_SOB_VECTOR")))))
  
 
