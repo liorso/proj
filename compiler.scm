@@ -2395,12 +2395,12 @@ done))
 (define make-tagged-offset ; todo complete for all types
   (lambda (const offset const-table)
     (begin
-      (display "raw-const:[")
-      (display const)
-      (display "offset:(")
-      (display offset)
-      (display ")")
-      (display "]\n")
+;      (display "raw-const:[")
+;      (display const)
+;      (display "offset:(")
+;      (display offset)
+;      (display ")")
+;      (display "]\n")
       (if (null? const)
           const-table
           (let ((first (car const))
@@ -2444,22 +2444,27 @@ done))
   (lambda (code memory-location)
     (let ((vector-of-consts (list->vector (get-list-of-consts code (list)))))
       (begin
-        ;(display ":")
+        ;(display "code{")
         ;(display code)
-        (display ":vector:")
-        (display vector-of-consts)
-        (display ":;\n")
-        (set! const-table (make-tagged-offset (reverse (delete-dup (type-const vector-of-consts))) memory-location (list)))
+        ;(display "}")
+        ;        (display ":vector:")
+        ;        (display vector-of-consts)
+        ;        (display ":;\n")
+        (set! const-table (reverse (cdr (reverse (make-tagged-offset (reverse (delete-dup (type-const vector-of-consts))) memory-location (list))))))
         ;(set! const-table (map-in-order map-make-tagged-offset-caller list-of-consts))
         ;(display (make-tagged-offset (reverse (delete-dup (type-const list-of-consts))) memory-location (list)))
+        ;(display "ct[")
+        ;(display const-table)
+        ;(display "]\n")
         (gen-const-table const-table)
         const-table))))
 
 (define make-const-table
   (lambda (code)
                 (make-const-table-2
-                 (append code '((const #t) (const #f) (const ())))
-                 ;code
+                 ;(append code `((const #t) (const #f) (const ()) (const ,void-object )))
+                 ;(append code `((const #t) (const #f) (const ())))
+                 code
                  const-table-mem-location)))
 
            
@@ -2467,22 +2472,22 @@ done))
   (lambda (const-table-local)
     (if (not (null? const-table-local)) 
         (begin
-          (display "ct[")
-          (display const-table-local)
-          (display "]")
+          ;(display "ct[")
+          ;(display const-table-local)
+          ;(display "]")
           (let* ((first (car const-table-local))
                  (rest (cdr const-table-local))
                  (type (caaddr first))
                  (value (reverse(cdr(caddr first)))))
-            (display "first: ")
-            (display first)
-            (display ";")
-            (display "type: ")
-            (display type)
-            (display ";")
-            (display "value: ")
-            (display value)
-            (display ";\n")
+            ;            (display "first: ")
+            ;            (display first)
+            ;            (display ";")
+            ;            (display "type: ")
+            ;            (display type)
+            ;            (display ";")
+            ;            (display "value: ")
+            ;            (display value)
+            ;            (display ";\n")
             (cond ((equal? type 'T_nil) (gen-make-sob-nil))
                   ((equal? type 'T_void) (gen-make-sob-void))
                   ((equal? type 'T_bool) (gen-make-sob-bool value))
@@ -2504,17 +2509,17 @@ done))
 
 (define gen-make-sob-nil
   (lambda ()
-    (display "nil\n")
+    ;(display "nil\n")
     (ltc (call "MAKE_SOB_NIL"))))
 
 (define gen-make-sob-void
   (lambda ()
-    (display "void\n")
+    ;(display "void\n")
     (ltc (call "MAKE_SOB_VOID"))))
 
 (define gen-make-sob-bool
   (lambda (value)
-    (display "bool\n")
+    ;(display "bool\n")
     (if (car value)
         (begin (ltc (push (imm  (ns 1))))
                (ltc (call "MAKE_SOB_BOOL")))
@@ -2523,13 +2528,13 @@ done))
 
 (define gen-make-sob-integer
   (lambda (value)
-    (display "int\n")
+    ;(display "int\n")
     (begin (ltc (push (imm  (ns (car value)))))
            (ltc (call "MAKE_SOB_INTEGER")))))
 
 (define gen-make-sob-fraction
   (lambda (value)
-    (display "fraction\n")
+    ;(display "fraction\n")
     (begin (ltc (push (imm  (ns (cadr value)))))
            (ltc (push (imm  (ns (car value)))))
            (ltc (call "MAKE_SOB_FRACTION")))))
@@ -2537,38 +2542,39 @@ done))
 
 (define gen-make-sob-char
   (lambda (value)
-    (display "char\n")
-    (display value)
-    (begin (ltc (push (imm  (char->string (car value)))))
+    ;(display "char\n")
+    ;(display value)
+    (begin (ltc (push (imm  (ns(char->integer (car value))))))
            (ltc (call "MAKE_SOB_CHAR")))))
 
 (define gen-make-sob-string
   (lambda (value)
-    (display "string\n")
+    ;(display "string\n")
     (let ((reversed (reverse value)))
-      (begin (map-in-order (lambda (x) (ltc (push (imm (ns(char->integer x)))))) (reverse(cdr reversed))) ;;string
+      (begin (map-in-order (lambda (x) (ltc (push (imm (ns(char->integer x)))))) (cdr reversed)) ;;string
              (ltc (push (imm  (ns (car reversed))))) ;;size
              (ltc (call "MAKE_SOB_STRING"))))))
 
 (define gen-make-sob-symbol
   (lambda (value)
-    (display "symbol\n")
+    ;(display "symbol\n")
     (begin (ltc (push (imm (ns (car value)))))  ;;string address
            (ltc (call "MAKE_SOB_SYMBOL")))))
 
 (define gen-make-sob-vector
   (lambda (value)
-    (display "vector\n")
-    (begin  (map-in-order (lambda (x) (ltc (push (imm (ns x))))) value) ;;list of addresses + size
-            ;(ltc (push (imm  (ns (car value))))) ;;size
-            (ltc (call "MAKE_SOB_VECTOR")))))
+    ;(display "vector\n")
+    (let ((reversed (reverse value)))
+    (begin  (map-in-order (lambda (x) (ltc (push (imm (ns x))))) (cdr reversed)) ;;list of addresses + size
+            (ltc (push (imm  (ns (car reversed))))) ;;size
+            (ltc (call "MAKE_SOB_VECTOR"))))))
  
 
 (define gen-make-sob-pair
   (lambda (value)
-    (display "pair\n")
-    (begin (ltc (push (imm  (ns (cadr value)))))
-           (ltc (push (imm  (ns (car value)))))
+    ;(display "pair\n")
+    (begin (ltc (push (imm  (ns (car value)))))
+           (ltc (push (imm  (ns (cadr value)))))
            (ltc (call "MAKE_SOB_PAIR")))))
 
 (define gen-if3
@@ -2829,7 +2835,11 @@ done))
            (set! CODE (sa CODE (file->string "prolog.c")))
            ;(make-global-table manipulated)
            (make-const-table manipulated)
-           (map-in-order code-gen manipulated)
+           (map-in-order (lambda (x) (begin (code-gen x)
+                                            (ltc (push "R0"))
+                                            (ltc (call "WRITE_SOB"))
+                                            (ltc (drop "1"))
+                                            (ltc (call "NEWLINE")))) manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V
            manipulated
