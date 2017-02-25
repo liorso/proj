@@ -2311,8 +2311,15 @@ done))
   (lambda (code)
     (begin (make-global-table-find code)
            (set! global-table (sort (lambda (first sec) (< (car first) (car sec))) global-table))
-           (malloc (ns (length global-table)) "R15")
+           (malloc (ns next-free-global) "R15")
     )))
+
+(define add-run-time-to-global
+  (lambda (run-time-list)
+    (map-in-order (lambda (x)
+           (set! global-table (cons (list next-free-global x) global-table))
+           (set! next-free-global (+ 1 next-free-global))) run-time-list)
+    ))
 
 (define lookup-global-help
   (lambda (key table)
@@ -2328,27 +2335,43 @@ done))
 
 (define gen-fvar
   (lambda (pe)
-    (ltc (mov "R0" (ind (lookup-global (cadr pe)))))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov "R0" (ind "R1")))
+    (ltc (pop "R1"))
     ))
 
 (define set-fvar
   (lambda (pe)
     (code-gen (caddr pe))
-    (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
-    (ltc (mov "R0" "VOID"))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr (cadr pe)))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    (ltc (pop "R1"))
+    (ltc (mov "R0" "T_VOID"))
     ))
 
 (define get-box-fvar
   (lambda (pe)
-    (ltc (mov "R0" (ind (lookup-global (cadr pe)))))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov "R0" (ind "R1")))
+    (ltc (pop "R1"))
     (ltc (mov "R0" (ind "R0")))
     ))
 
 (define def-fvar
   (lambda (pe)
     (code-gen (caddr pe))
-    (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr (cadr pe)))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
     (ltc (mov "R0" "T_VOID"))
+    (ltc (pop "R1"))
     ))
   
  
@@ -3016,17 +3039,204 @@ done))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
 
 
-          ;((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
-                                           ;(ltc (call "MAKE_SOB_INTEGER"))
-                                           ;(ltc (drop (ns 1))))) ;TODO
+          ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
+                                           (ltc (call "MAKE_SOB_INTEGER"))
+                                           (ltc (drop (ns 1))))) ;TODO
 
           
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
 
 
+;---------------------------------------------------------------------------------
+;--------------------------------------RUN TIME-----------------------------------
+;---------------------------------------------------------------------------------
 
+(define make-cons
+  (lambda ()
+    (let ((body-lab "LconsBody")
+          (closure-lab "LmakeConsClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (push (fparg "3")))
+      (ltc (push (fparg "2")))
+      (ltc (call "MAKE_SOB_PAIR"))
+      (ltc (drop "2"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
 
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8888"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'cons)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-car
+  (lambda ()
+    (let ((body-lab "LcarBody")
+          (closure-lab "LmakeCarClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov "R0" (indd "R1" "1")))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "99999"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'car)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-cdr
+  (lambda ()
+    (let ((body-lab "LcdrBody")
+          (closure-lab "LmakeCdrClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov "R0" (indd "R1" "2")))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "454545"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'cdr)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-set-car
+  (lambda ()
+    (let ((body-lab "LSetcarBody")
+          (closure-lab "LmakeSetCarClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov (indd "R1" "1") (fparg "3")))
+      (ltc (mov "R0" "T_VOID"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "121212"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'set-car!)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-set-cdr
+  (lambda ()
+    (let ((body-lab "LSetcdrBody")
+          (closure-lab "LmakeSetCdrClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov (indd "R1" "2") (fparg "3")))
+      (ltc (mov "R0" "T_VOID"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "1313131"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'set-cdr!)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define predicate-maker
+  (lambda (proc-name type closure-lab body-lab)
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))
+    (ltc (cmp (fparg "1") "1"))
+    (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+    (ltc (mov "R1" (fparg "2")))
+    (ltc (cmp (ind "R1") type))
+    (let ((not-type (lab-construct "NOT_TYPE_"))
+          (exit-type (lab-construct "EXIT_TYPE_")))
+      (ltc (jmp-ne not-type))
+     ; (ltc (mov "R0" "T_TRUE"))TODO
+      (ltc (jmp exit-type))
+      (labtc not-type)
+      ;(ltc (mov "R0" "T_FALSE"))TODO
+      (labtc exit-type)
+      (ltc (pop "FP"))
+      (ltc "RETURN"))
+
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "1515"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
+
+(define make-pair?
+  (lambda ()
+    (predicate-maker 'pair? "T_PAIR" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+      
 
 
 ;------------------------------------------------------------------------------
@@ -3079,12 +3289,12 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    ;(annotate-tc TODO
+    (annotate-tc TODO
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
         (eliminate-nested-defines
-         (parse sexps)))));)
+         (parse sexps))))))
     ))
 
 
@@ -3124,6 +3334,28 @@ done))
            (set! next-free-global 0))
     ))
 
+(define add-run-to-list
+  (lambda () ;TODO: to add all the runtime functions
+    (add-run-time-to-global (list 'cons 'car 'cdr 'set-car! 'set-cdr! pair?))
+    ))
+
+(define add-run-IMPL-function
+  (lambda ()
+    (map-in-order (lambda (x) (x)) (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?))
+    ))
+
+(define gen-phrase-print
+  (lambda (x) (begin (code-gen x)
+                     (let ((lab-void (lab-construct "VOID_NOT_PRINT_")))
+                       (ltc (cmp "R0" "T_VOID"))
+                       (ltc (jmp-eq lab-void))
+                       (ltc (push "R0"))
+                       (ltc (call "WRITE_SOB"))
+                       (ltc (drop "1"))
+                       (ltc (call "NEWLINE"))
+                       (labtc lab-void))
+                     )))
+      
 (define compile-scheme-file
   (lambda (in-file out-file)
     (begin (initial-params)
@@ -3131,13 +3363,11 @@ done))
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
            (set! CODE (sa CODE (file->string "prolog.c")))
-           ;(make-global-table manipulated)
            (make-const-table manipulated)
-           (map-in-order (lambda (x) (begin (code-gen x)
-                                            (ltc (push "R0"))
-                                            (ltc (call "WRITE_SOB"))
-                                            (ltc (drop "1"))
-                                            (ltc (call "NEWLINE")))) manipulated)
+           (add-run-to-list)
+           (make-global-table manipulated)
+           (add-run-IMPL-function)
+           (map-in-order gen-phrase-print manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V
            manipulated
