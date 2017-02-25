@@ -2311,12 +2311,12 @@ done))
   (lambda (code)
     (begin (make-global-table-find code)
            (set! global-table (sort (lambda (first sec) (< (car first) (car sec))) global-table))
-           (malloc (ns (length global-table)) "R15")
+           (malloc (ns next-free-global) "R15")
     )))
 
 (define add-run-time-to-global
   (lambda (run-time-list)
-    (map (lambda (x)
+    (map-in-order (lambda (x)
            (set! global-table (cons (list next-free-global x) global-table))
            (set! next-free-global (+ 1 next-free-global))) run-time-list)
     ))
@@ -3039,9 +3039,9 @@ done))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
 
 
-          ;((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
-                                           ;(ltc (call "MAKE_SOB_INTEGER"))
-                                           ;(ltc (drop (ns 1))))) ;TODO
+          ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
+                                           (ltc (call "MAKE_SOB_INTEGER"))
+                                           (ltc (drop (ns 1))))) ;TODO
 
           
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
@@ -3070,7 +3070,6 @@ done))
       (ltc (mov "FP" "SP"))
       (ltc (cmp (fparg "1") "2"))
       (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
-      (ltc "INFO")
       (ltc (push (fparg "3")))
       (ltc (push (fparg "2")))
       (ltc (call "MAKE_SOB_PAIR"))
@@ -3083,9 +3082,10 @@ done))
       (ltc (call "MALLOC"))
       (ltc (drop "1"))
       (ltc (mov (ind "R0") "T_CLOSURE"))
-      (ltc (mov (indd "R0" "1") "111"))
+      (ltc (mov (indd "R0" "1") "8888"))
       (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
       (ltc (mov "R1" (lookup-global 'cons)))
+      (ltc "INFO")
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
@@ -3112,9 +3112,38 @@ done))
       (ltc (call "MALLOC"))
       (ltc (drop "1"))
       (ltc (mov (ind "R0") "T_CLOSURE"))
-      (ltc (mov (indd "R0" "1") "111"))
+      (ltc (mov (indd "R0" "1") "99999"))
       (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
       (ltc (mov "R1" (lookup-global 'car)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-cdr
+  (lambda ()
+    (let ((body-lab "LcdrBody")
+          (closure-lab "LmakeCdrClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov "R0" (indd "R1" "2")))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "454545"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'cdr)))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
@@ -3171,12 +3200,12 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    ;(annotate-tc TODO
+    (annotate-tc TODO
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
         (eliminate-nested-defines
-         (parse sexps)))));)
+         (parse sexps))))))
     ))
 
 
@@ -3218,12 +3247,12 @@ done))
 
 (define add-run-to-list
   (lambda () ;TODO: to add all the runtime functions
-    (add-run-time-to-global (list 'cons 'car))
+    (add-run-time-to-global (list 'cons 'car 'cdr))
     ))
 
 (define add-run-IMPL-function
   (lambda ()
-    (map (lambda (x) (x)) (list make-cons make-car))
+    (map-in-order (lambda (x) (x)) (list make-cons make-car make-cdr))
     ))
       
       
