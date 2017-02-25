@@ -2346,20 +2346,149 @@ done))
     (ltc (mov "R0" "T_VOID"))
     ))
   
+ 
   
 
-
 ;-----------------------const-table
+(define const-table (list))
 
+(define find-const-in-code
+  (lambda (code)
+    (cond ((or (not (pair? code)) (null? code)) '())
+          ((equal? (car code) 'const) (cadr code))
+          (else `((find-const-in-code (car code)) ,@(find-const-in-code (cdr code))))) ; NOT GOOD!
+    ))
+
+(define delete-dup
+  (lambda (e)
+    (if (or (null? e) (null? (cdr e))) e
+        (if (member (car e) (cdr e)) (delete-dup (cdr e))
+            (cons (car e) (delete-dup (cdr e)))))))
+
+(define type-const
+  (lambda (e)
+    (cond
+      ((or (char? e) (number? e) (string? e) (null? e) (boolean? e)) `(,e)); was void?
+      ((pair? e)
+       `(,e ,@(type-const (car e)) ,@(type-const (cdr e))))
+       ((vector? e)
+        `(,e ,@(apply append
+                      (map type-const
+                           (vector->list e)))))
+       ((symbol? e)
+        `(,e ,@(type-const (symbol->string e))))
+       (else (type-const (cdr e)))
+       )))
+
+(define const-lookup
+  (lambda (val const-table)
+    (cond
+      ((null? const-table) '())
+      ((equal? val (caar const-table)) (cadar const-table))
+      (else (const-lookup val (cdr const-table))))))
+
+(define const-lookup-vector
+  (lambda (const-table)
+    (lambda (vector-ref)
+      (const-lookup vector-ref const-table))))     
+
+
+(define make-tagged-offset2 ; todo complete for all types
+  (lambda (list_of_consts offset const-table)
+    (if (null? list_of_consts)
+        '()
+        (let ((first (car list_of_consts))
+              (remainder (cdr list_of_consts)))
+          (cond
+            ((null? first)
+             (append const-table `(,first ,offset (T_nil)) (make-tagged-offset remainder (+ 1 offset) const-table)))
+            ((number? first)
+             (append const-table `(,first ,offset (T_int ,first)) (make-tagged-offset remainder (+ 2 offset) const-table))))
+            ((pair? first)
+             (append const-table `(,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table))) (make-tagged-offset remainder (+ 3) const-table)))))))
+
+
+
+      
+(define make-tagged-offset ; todo complete for all types
+  (lambda (const offset const-table)
+    (if (null? const)
+        const-table
+        (let ((first (car const))
+              (remainder (cdr const)))
+          (cond
+            ((null? first)
+             (make-tagged-offset remainder (+ 1 offset) (append const-table `((,first ,offset (T_nil))))))
+            ;((void? first)
+             ;(make-tagged-offset remainder (+ 1 offset) (append const-table `((,first ,offset (T_void))))))
+            ((boolean? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_bool ,first))))))
+            ((and (number? first) (integer? first))
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_integer ,first))))))
+            ((and (number? first) (not (integer? first)))
+             (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_frac ,(numerator first) ,(denominator first)))))))
+            ((char? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_char ,first))))))
+            ((string? first)
+             (make-tagged-offset remainder (+ 2 (string-length first) offset) (append const-table `((,first ,offset (T_string ,(string-length first) ,@(string->list first)))))))
+            ((symbol? first)
+             (make-tagged-offset remainder (+ 2 offset) (append const-table `((,first ,offset (T_symbol  ,(const-lookup (symbol->string first) const-table)))))))
+            ((vector? first)
+             (make-tagged-offset remainder (+ 3 (vector-length first) offset) (append const-table `((,first ,offset (T_vector ,(vector-map (const-lookup-vector const-table) first)))))))
+            ((pair? first)
+             (make-tagged-offset remainder (+ 3 offset) (append const-table `((,first ,offset (T_pair ,(const-lookup (car first) const-table) ,(const-lookup (cdr first) const-table))))))))))))
+
+
+(define  get-list-of-consts
+  (lambda (code list-of-consts)
+    (cond ((null? code) list-of-consts)
+          ((list? (car code)) (append list-of-consts (get-list-of-consts (car code)(list)) (get-list-of-consts (cdr code) (list))))
+          ((equal? (car code) 'const) (append list-of-consts (cdr code)))
+          (else (append list-of-consts (get-list-of-consts (cdr code) (list)))))))
+
+(define make-const-table
+  (lambda (code memory-location)
+    (let ((list-of-consts (get-list-of-consts code (list))))
+      (begin
+        (set! const-table (make-tagged-offset (reverse (delete-dup (type-const list-of-consts))) memory-location (list)))
+        (gen-const-table const-table)))))
            
            
+(define gen-const-table
+  (lambda (const-table)
+    (let* ((first (car const-table))
+          (rest (cdr const-table))
+          (type (caddr first))
+          (value (cdaddr first)))
+    (cond ((equal? type 'T_nil) (gen-make-sob-nil))
+          ((equal? type 'T_void) (gen-make-sob-void))
+          ((equal? type 'T_bool) (gen-make-sob-bool (car value)))
+          ((equal? type 'T_integer) (gen-make-sob-integer (car value)))))))
 
+    
+(define const-table-mem-location 1)
 
 
 ;------------------------------------code gen-------------------------------------------------------------
 (define code-gen 1)
 
+(define gen-make-sob-nil
+  (lambda ()
+    (ltc (call "make_sob_nil"))))
 
+(define gen-make-sob-void
+  (lambda ()
+    (ltc (call "make_sob_void"))))
+
+(define gen-make-sob-bool
+  (lambda (value)
+    (begin (ltc (push (imm  value)))
+           (ltc (call "make_sob_nil")))))
+
+(define gen-make-sob-integer
+  (lambda (value)
+    (begin (ltc (push (imm  value)))
+           (ltc (call "make_sob_integer")))))
     
 
 
@@ -2387,6 +2516,7 @@ done))
                        (ltc (jmp-ne lab-exit)))) (cadr pe))
              (labtc lab-exit)
              )))
+
 
 (define gen-applic
   (lambda (pe)
@@ -2721,6 +2851,7 @@ done))
       (ltc (mov "R0" (indd "R0" major)))
       (ltc (mov "R0" (indd "R0" minor)))
       )))
+
     
             
 
@@ -2761,6 +2892,7 @@ done))
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
           ((equal? 'fvar (car pe)) (gen-fvar pe))
+
           ((equal? 'def (car pe)) (gen-def pe)) ;TODO
           ((equal? 'set (car pe)) (gen-set pe)) ;TODO
           ((equal? 'seq (car pe)) (map-in-order code-gen (cadr pe)))
@@ -2777,7 +2909,14 @@ done))
 
           ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
                                            (ltc (call "MAKE_SOB_INTEGER"))
+<<<<<<< HEAD
                                            (ltc (drop (ns 1))))) ;TODO        
+=======
+                                           (ltc (drop (ns 1))))) ;TODO
+
+
+          (#t (begin (code-gen (car pe)) (code-gen (cdr pe)))) ;TO DELETE
+>>>>>>> 179832db7d8572b0f6377c829e38152d9e2179f3
           
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
@@ -2818,6 +2957,33 @@ done))
                         (close-output-port out-port)))))
          (run l)))
     ))
+(define string->sexpr
+  (lambda (str)
+    (<sexpr> (string->list str)
+             (lambda (e s)
+              (list e (list->string s)))
+            (lambda (klum) (display `(ERROR SEXPR))))
+    ))
+
+(define make-sexpes
+  (lambda (str)
+    (letrec ((run (lambda (slst rest)
+                     (if (eq? rest "") slst
+                         (let ((parsed (string->sexpr rest)))
+                           (run (append slst (list (car parsed))) (cadr parsed)))))))
+      (run '() str))
+    ))
+
+(define parse-manipulate
+  (lambda (sexps)
+    ;(annotate-tc TODO
+     (pe->lex-pe
+      (box-set 
+       (remove-applic-lambda-nil
+        (eliminate-nested-defines
+         (parse sexps)))));)
+    ))
+
 
 (define string->sexpr
   (lambda (str)
@@ -2863,7 +3029,7 @@ done))
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
            (set! CODE (sa CODE (file->string "prolog.c")))
            (make-global-table manipulated)
-           ;(make-const-table manipulated)
+           (make-const-table manipulated const-table-mem-location )
            (map-in-order code-gen manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V
