@@ -3052,14 +3052,6 @@ done))
 ;--------------------------------------RUN TIME-----------------------------------
 ;---------------------------------------------------------------------------------
 
-(define make-closure
-  (lambda (major lab)
-    (ltc (push (sa "LABLEL(" lab ")")))
-    (ltc (push (imm (ns major))))
-    (ltc (call "MAKE_SOB_CLOSURE"))
-    (ltc (drop "2"))
-    ))
-
 (define make-cons
   (lambda ()
     (let ((body-lab "LconsBody")
@@ -3085,7 +3077,6 @@ done))
       (ltc (mov (indd "R0" "1") "8888"))
       (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
       (ltc (mov "R1" (lookup-global 'cons)))
-      (ltc "INFO")
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
@@ -3148,6 +3139,104 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
+(define make-set-car
+  (lambda ()
+    (let ((body-lab "LSetcarBody")
+          (closure-lab "LmakeSetCarClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov (indd "R1" "1") (fparg "3")))
+      (ltc (mov "R0" "T_VOID"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "121212"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'set-car!)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-set-cdr
+  (lambda ()
+    (let ((body-lab "LSetcdrBody")
+          (closure-lab "LmakeSetCdrClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov (indd "R1" "2") (fparg "3")))
+      (ltc (mov "R0" "T_VOID"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "1313131"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'set-cdr!)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define predicate-maker
+  (lambda (proc-name type closure-lab body-lab)
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))
+    (ltc (cmp (fparg "1") "1"))
+    (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+    (ltc (mov "R1" (fparg "2")))
+    (ltc (cmp (ind "R1") type))
+    (let ((not-type (lab-construct "NOT_TYPE_"))
+          (exit-type (lab-construct "EXIT_TYPE_")))
+      (ltc (jmp-ne not-type))
+     ; (ltc (mov "R0" "T_TRUE"))TODO
+      (ltc (jmp exit-type))
+      (labtc not-type)
+      ;(ltc (mov "R0" "T_FALSE"))TODO
+      (labtc exit-type)
+      (ltc (pop "FP"))
+      (ltc "RETURN"))
+
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "1515"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
+
+(define make-pair?
+  (lambda ()
+    (predicate-maker 'pair? "T_PAIR" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+      
 
 
 ;------------------------------------------------------------------------------
@@ -3247,14 +3336,25 @@ done))
 
 (define add-run-to-list
   (lambda () ;TODO: to add all the runtime functions
-    (add-run-time-to-global (list 'cons 'car 'cdr))
+    (add-run-time-to-global (list 'cons 'car 'cdr 'set-car! 'set-cdr! pair?))
     ))
 
 (define add-run-IMPL-function
   (lambda ()
-    (map-in-order (lambda (x) (x)) (list make-cons make-car make-cdr))
+    (map-in-order (lambda (x) (x)) (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?))
     ))
-      
+
+(define gen-phrase-print
+  (lambda (x) (begin (code-gen x)
+                     (let ((lab-void (lab-construct "VOID_NOT_PRINT_")))
+                       (ltc (cmp "R0" "T_VOID"))
+                       (ltc (jmp-eq lab-void))
+                       (ltc (push "R0"))
+                       (ltc (call "WRITE_SOB"))
+                       (ltc (drop "1"))
+                       (ltc (call "NEWLINE"))
+                       (labtc lab-void))
+                     )))
       
 (define compile-scheme-file
   (lambda (in-file out-file)
@@ -3267,11 +3367,7 @@ done))
            (add-run-to-list)
            (make-global-table manipulated)
            (add-run-IMPL-function)
-           (map-in-order (lambda (x) (begin (code-gen x)
-                                            (ltc (push "R0"))
-                                            (ltc (call "WRITE_SOB"))
-                                            (ltc (drop "1"))
-                                            (ltc (call "NEWLINE")))) manipulated)
+           (map-in-order gen-phrase-print manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V
            manipulated
