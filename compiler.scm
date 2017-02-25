@@ -2314,6 +2314,13 @@ done))
            (malloc (ns (length global-table)) "R15")
     )))
 
+(define add-run-time-to-global
+  (lambda (run-time-list)
+    (map (lambda (x)
+           (set! global-table (cons (list next-free-global x) global-table))
+           (set! next-free-global (+ 1 next-free-global))) run-time-list)
+    ))
+
 (define lookup-global-help
   (lambda (key table)
     (cond ((null? table) "ERROR: NOT IN GLOBAL TABLE")
@@ -2328,27 +2335,43 @@ done))
 
 (define gen-fvar
   (lambda (pe)
-    (ltc (mov "R0" (ind (lookup-global (cadr pe)))))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov "R0" (ind "R1")))
+    (ltc (pop "R1"))
     ))
 
 (define set-fvar
   (lambda (pe)
     (code-gen (caddr pe))
-    (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
-    (ltc (mov "R0" "VOID"))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr (cadr pe)))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    (ltc (pop "R1"))
+    (ltc (mov "R0" "T_VOID"))
     ))
 
 (define get-box-fvar
   (lambda (pe)
-    (ltc (mov "R0" (ind (lookup-global (cadr pe)))))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov "R0" (ind "R1")))
+    (ltc (pop "R1"))
     (ltc (mov "R0" (ind "R0")))
     ))
 
 (define def-fvar
   (lambda (pe)
     (code-gen (caddr pe))
-    (ltc (mov (ind (lookup-global (cadr (cadr pe)))) "R0"))
+    (ltc (push "R1"))
+    (ltc (mov "R1" (lookup-global (cadr (cadr pe)))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
     (ltc (mov "R0" "T_VOID"))
+    (ltc (pop "R1"))
     ))
   
  
@@ -3025,7 +3048,75 @@ done))
     ))
 
 
+;---------------------------------------------------------------------------------
+;--------------------------------------RUN TIME-----------------------------------
+;---------------------------------------------------------------------------------
 
+(define make-closure
+  (lambda (major lab)
+    (ltc (push (sa "LABLEL(" lab ")")))
+    (ltc (push (imm (ns major))))
+    (ltc (call "MAKE_SOB_CLOSURE"))
+    (ltc (drop "2"))
+    ))
+
+(define make-cons
+  (lambda ()
+    (let ((body-lab "LconsBody")
+          (closure-lab "LmakeConsClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (push (fparg "3")))
+      (ltc (push (fparg "2")))
+      (ltc (call "MAKE_SOB_PAIR"))
+      (ltc (drop "2"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "111"))
+      (ltc (mov (indd "R0" "2") "LABEL(" body-lab ")"))
+      (ltc (mov "R1" (lookup-global 'cons)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-car
+  (lambda ()
+    (let ((body-lab "LcarBody")
+          (closure-lab "LmakeCarClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_PAIR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov "R0" (indd "R1" "1")))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "111"))
+      (ltc (mov (indd "R0" "2") "LABEL(" body-lab ")"))
+      (ltc (mov "R1" (lookup-global 'car)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 
 
 
@@ -3124,6 +3215,17 @@ done))
            (set! next-free-global 0))
     ))
 
+(define add-run-to-list
+  (lambda () ;TODO: to add all the runtime functions
+    (add-run-time-to-global (list 'cons 'car))
+    ))
+
+(define add-run-IMPL-function
+  (lambda ()
+    (map (lambda (x) (x)) (list make-cons make-car))
+    ))
+      
+      
 (define compile-scheme-file
   (lambda (in-file out-file)
     (begin (initial-params)
@@ -3131,8 +3233,10 @@ done))
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
            (set! CODE (sa CODE (file->string "prolog.c")))
-           ;(make-global-table manipulated)
            (make-const-table manipulated)
+           (add-run-to-list)
+           (make-global-table manipulated)
+           (add-run-IMPL-function)
            (map-in-order (lambda (x) (begin (code-gen x)
                                             (ltc (push "R0"))
                                             (ltc (call "WRITE_SOB"))
