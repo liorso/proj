@@ -2509,8 +2509,8 @@ done))
   (lambda (code)
                 (make-const-table-2
                  ;(append code `((const #t) (const #f) (const ()) (const ,void-object )))
-                 ;(append code `((const #t) (const #f) (const ())))
-                 code
+                 (append  `((const #t #f ())) code)
+                 ;code
                  const-table-mem-location)))
 
            
@@ -3336,7 +3336,7 @@ done))
 
 (define add-run-to-list
   (lambda () ;TODO: to add all the runtime functions
-    (add-run-time-to-global (list 'cons 'car 'cdr 'set-car! 'set-cdr! pair?))
+    (add-run-time-to-global (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair?))
     ))
 
 (define add-run-IMPL-function
