@@ -3313,7 +3313,7 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
- ;TODO: make-rational? 
+(define make-rational? (lambda () 1)) 
 
 (define make-number?
   (lambda ()
@@ -3334,14 +3334,14 @@ done))
       (ltc (mov "R0" (ns (const-lookup #t const-table))))
       (ltc (jmp exit-type))
       (labtc not-type1)
-      (ltc (cmp (ind "R1") "T_fraction"))
+      (ltc (cmp (ind "R1") "T_FRACTION"))
       (let ((not-type2 (lab-construct "NOT_TYPE2_")))
         (ltc (jmp-ne not-type2))
         (ltc (mov "R0" (ns (const-lookup #t const-table))))
         (ltc (jmp exit-type))
         (labtc not-type2)
         (ltc (mov "R0" (ns (const-lookup #f const-table))))
-        (labtc exit-type2)
+        (labtc exit-type)
         (ltc (pop "FP"))
         (ltc "RETURN")))
 
