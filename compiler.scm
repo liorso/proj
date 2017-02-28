@@ -2580,7 +2580,6 @@ done))
 
 (define gen-make-sob-fraction
   (lambda (value)
-    (display "fraction\n")
     (begin (ltc (push (imm  (ns (cadr value)))))
            (ltc (push (imm  (ns (car value)))))
            (ltc (call "MAKE_SOB_FRACTION")))))
@@ -2628,8 +2627,8 @@ done))
       (begin (define lab-else (lab-construct "L_if3_else_"))
              (define lab-exit (lab-construct "L_if3_exit_"))
              (code-gen (cadr pe))
-             ;(ltc (cmp "R0" "FALSE")) ;TODO: change to false
-             ;(ltc (jmp-eq lab-else))
+             (ltc (cmp "R0" (ns (const-lookup #f const-table))))
+             (ltc (jmp-eq lab-else))
              (code-gen (caddr pe))
              (ltc (jmp lab-exit))
              (labtc lab-else)
@@ -2643,7 +2642,7 @@ done))
              (map-in-order
               (lambda (l)
                 (begin (code-gen l)
-                       (ltc (cmp "R0" "FALSE")) ;TODO: change to false
+                       (ltc (cmp "R0" (ns (const-lookup #f const-table)))) ;TODO: change to false
                        (ltc (jmp-ne lab-exit)))) (cadr pe))
              (labtc lab-exit)
              )))
@@ -2739,7 +2738,7 @@ done))
                    (ltc (incr "R5"))
                    (ltc (incr "R4")))))
         (malloc "3" "R0")
-        (ltc (mov (indd "R0" "0") "TCLOSURE"))
+        (ltc (mov (indd "R0" "0") "T_CLOSURE"))
         (ltc (mov (indd "R0" "1") "R2"))
         (ltc (mov (indd "R0" "2") (lab body-leb)))
         (ltc (jmp exit-clos-leb))
@@ -3726,7 +3725,8 @@ done))
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
-                                  'make-vector 'make-string 'string-ref 'vector-ref 'vector-set! 'string-set!))
+                                  ;'make-vector 'make-string
+                                  'string-ref 'vector-ref 'vector-set! 'string-set!))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
@@ -3738,7 +3738,8 @@ done))
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
-                                 make-make-str make-make-vec make-str-ref make-vec-ref make-vec-set
+                                 ;make-make-str make-make-vec
+                                 make-str-ref make-vec-ref make-vec-set
                                  make-str-set))
 ;make-rational? make-number?)) TODO
 
