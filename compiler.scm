@@ -3212,10 +3212,10 @@ done))
     (let ((not-type (lab-construct "NOT_TYPE_"))
           (exit-type (lab-construct "EXIT_TYPE_")))
       (ltc (jmp-ne not-type))
-     ; (ltc (mov "R0" "T_TRUE"))TODO
+      (ltc (mov "R0" (ns (const-lookup #t const-table))))
       (ltc (jmp exit-type))
       (labtc not-type)
-      ;(ltc (mov "R0" "T_FALSE"))TODO
+      (ltc (mov "R0" (ns (const-lookup #f const-table))))
       (labtc exit-type)
       (ltc (pop "FP"))
       (ltc "RETURN"))
@@ -3224,6 +3224,7 @@ done))
     (ltc (push "3"))
     (ltc (call "MALLOC"))
     (ltc (drop "1"))
+    (ltc "INFO")
     (ltc (mov (ind "R0") "T_CLOSURE"))
     (ltc (mov (indd "R0" "1") "1515"))
     (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
@@ -3236,7 +3237,30 @@ done))
   (lambda ()
     (predicate-maker 'pair? "T_PAIR" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
     ))
-      
+
+(define make-boolean?
+  (lambda ()
+    (predicate-maker 'boolean? "T_BOOL" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-char?
+  (lambda ()
+    (predicate-maker 'char? "T_CHAR" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-integer?
+  (lambda ()
+    (predicate-maker 'integer? "T_INTEGER" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-null?
+  (lambda ()
+    (predicate-maker 'null? "T_NIL" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+  make-number?
+                                 make-procedure? make-rational? make-string? make-symbol?
+                                 make-vector? make-zero?
 
 
 ;------------------------------------------------------------------------------
@@ -3334,14 +3358,22 @@ done))
            (set! next-free-global 0))
     ))
 
+(define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
+                                  'null? 'number? 'procedure? 'rational? 'string? 'symbol?
+                                  'vector? 'zero?))
+  
 (define add-run-to-list
   (lambda () ;TODO: to add all the runtime functions
-    (add-run-time-to-global (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair?))
+    (add-run-time-to-global run-time-func-name)
     ))
+(define run-time-func-impl (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?
+                                 make-boolean? make-char? make-integer? make-null? make-number?
+                                 make-procedure? make-rational? make-string? make-symbol?
+                                 make-vector? make-zero?))
 
 (define add-run-IMPL-function
   (lambda ()
-    (map-in-order (lambda (x) (x)) (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?))
+    (map-in-order (lambda (x) (x)) run-time-func-impl)
     ))
 
 (define gen-phrase-print
