@@ -3019,6 +3019,11 @@ done))
           (else "NOT IMPL")) ;TODO
     ))
 
+(define gen-const
+  (lambda (pe)
+    (ltc (mov "R0" (imm (ns (const-lookup (cadr pe) const-table)))))
+    ))
+
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
@@ -3037,13 +3042,7 @@ done))
           ((equal? 'pvar (car pe)) (gen-pvar pe))
           ((equal? 'bvar (car pe)) (gen-bvar pe))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
-
-
-          ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
-                                           (ltc (call "MAKE_SOB_INTEGER"))
-                                           (ltc (drop (ns 1))))) ;TODO
-
-          
+          ((equal? 'const (car pe)) (gen-const pe))        
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
 
@@ -3212,10 +3211,10 @@ done))
     (let ((not-type (lab-construct "NOT_TYPE_"))
           (exit-type (lab-construct "EXIT_TYPE_")))
       (ltc (jmp-ne not-type))
-     ; (ltc (mov "R0" "T_TRUE"))TODO
+      (ltc (mov "R0" (ns (const-lookup #t const-table))))
       (ltc (jmp exit-type))
       (labtc not-type)
-      ;(ltc (mov "R0" "T_FALSE"))TODO
+      (ltc (mov "R0" (ns (const-lookup #f const-table))))
       (labtc exit-type)
       (ltc (pop "FP"))
       (ltc "RETURN"))
@@ -3224,6 +3223,7 @@ done))
     (ltc (push "3"))
     (ltc (call "MALLOC"))
     (ltc (drop "1"))
+    (ltc "INFO")
     (ltc (mov (ind "R0") "T_CLOSURE"))
     (ltc (mov (indd "R0" "1") "1515"))
     (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
@@ -3236,7 +3236,127 @@ done))
   (lambda ()
     (predicate-maker 'pair? "T_PAIR" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
     ))
+
+(define make-boolean?
+  (lambda ()
+    (predicate-maker 'boolean? "T_BOOL" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-char?
+  (lambda ()
+    (predicate-maker 'char? "T_CHAR" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-integer?
+  (lambda ()
+    (predicate-maker 'integer? "T_INTEGER" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-null?
+  (lambda ()
+    (predicate-maker 'null? "T_NIL" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-procedure?
+  (lambda ()
+    (predicate-maker 'procedure? "T_CLOSURE" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+(define make-string?
+  (lambda ()
+    (predicate-maker 'string? "T_STRING" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+(define make-symbol?
+  (lambda ()
+    (predicate-maker 'symbol? "T_SYMBOL" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-vector?
+  (lambda ()
+    (predicate-maker 'vector? "T_VECTOR" (lab-construct "TYPE_CLOS_") (lab-construct "TYPE_BODY_"))
+    ))
+
+(define make-zero?
+  (lambda ()
+    (let ((proc-name 'zero?)
+          (closure-lab (lab-construct "TYPE_CLOS_"))
+          (body-lab (lab-construct "TYPE_BODY_")))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (indd "R1" "1") (imm "0")))
+      (let ((not-type (lab-construct "NOT_TYPE_"))
+            (exit-type (lab-construct "EXIT_TYPE_")))
+        (ltc (jmp-ne not-type))
+        (ltc (mov "R0" (ns (const-lookup #t const-table))))
+        (ltc (jmp exit-type))
+        (labtc not-type)
+        (ltc (mov "R0" (ns (const-lookup #f const-table))))
+        (labtc exit-type)
+        (ltc (pop "FP"))
+        (ltc "RETURN"))
       
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc "INFO")
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "1515"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global proc-name)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+;(define make-rational? (lambda () 1)) 
+
+;(define make-number?
+;  (lambda ()
+;    (let ((proc-name 'number?)
+ ;;         (closure-lab (lab-construct "TYPE_CLOS_"))
+ ;         (body-lab (lab-construct "TYPE_BODY_")))
+  ;  (ltc (jmp closure-lab))
+ ;   (labtc body-lab)
+ ;   (ltc (push "FP"))
+ ;   (ltc (mov "FP" "SP"))
+ ;   (ltc (cmp (fparg "1") "1"))
+ ;;   (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+ ;   (ltc (mov "R1" (fparg "2")))
+ ;   (ltc (cmp (ind "R1") "T_INTEGER"))
+ ; ;  (let ((not-type1 (lab-construct "NOT_TYPE1_"))
+ ;         (exit-type (lab-construct "EXIT_TYPE_")))
+ ;     (ltc (jmp-ne not-type1))
+ ;     (ltc (mov "R0" (ns (const-lookup #t const-table))))
+ ;     (ltc (jmp exit-type))
+ ;     (labtc not-type1)
+;      (ltc (cmp (ind "R1") "T_FRACTION"))
+;      (let ((not-type2 (lab-construct "NOT_TYPE2_")))
+;        (ltc (jmp-ne not-type2))
+;        (ltc (mov "R0" (ns (const-lookup #t const-table))))
+  ;      (ltc (jmp exit-type))
+  ;      (labtc not-type2)
+   ;     (ltc (mov "R0" (ns (const-lookup #f const-table))))
+   ;;     (labtc exit-type)
+   ;     (ltc (pop "FP"))
+   ;     (ltc "RETURN")))
+
+  ;  (labtc closure-lab)
+  ;  (ltc (push "3"))
+  ;  (ltc (call "MALLOC"))
+  ;  (ltc (drop "1"))
+  ;  (ltc "INFO")
+  ;  (ltc (mov (ind "R0") "T_CLOSURE"))
+  ;  (ltc (mov (indd "R0" "1") "1515"))
+  ;  (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+  ;  (ltc (mov "R1" (lookup-global proc-name)))
+  ;  (ltc (add "R1" "R15"))
+  ;  (ltc (mov (ind "R1") "R0"))
+  ;  )))
+
 
 
 ;------------------------------------------------------------------------------
@@ -3334,14 +3454,22 @@ done))
            (set! next-free-global 0))
     ))
 
+(define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
+                                  'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?))
+                                 ; 'rational? 'number?))TODO
+  
 (define add-run-to-list
   (lambda () ;TODO: to add all the runtime functions
-    (add-run-time-to-global (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair?))
+    (add-run-time-to-global run-time-func-name)
     ))
+(define run-time-func-impl (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?
+                                 make-boolean? make-char? make-integer? make-null? 
+                                 make-procedure? make-string? make-symbol? make-vector? make-zero?))
+;make-rational? make-number?)) TODO
 
 (define add-run-IMPL-function
   (lambda ()
-    (map-in-order (lambda (x) (x)) (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?))
+    (map-in-order (lambda (x) (x)) run-time-func-impl)
     ))
 
 (define gen-phrase-print
