@@ -3019,6 +3019,11 @@ done))
           (else "NOT IMPL")) ;TODO
     ))
 
+(define gen-const
+  (lambda (pe)
+    (ltc (mov "R0" (imm (ns (const-lookup (cadr pe) const-table)))))
+    ))
+
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
@@ -3037,13 +3042,7 @@ done))
           ((equal? 'pvar (car pe)) (gen-pvar pe))
           ((equal? 'bvar (car pe)) (gen-bvar pe))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
-
-
-          ((equal? 'const (car pe)) (begin (ltc (push (ns (cadr pe))))
-                                           (ltc (call "MAKE_SOB_INTEGER"))
-                                           (ltc (drop (ns 1))))) ;TODO
-
-          
+          ((equal? 'const (car pe)) (gen-const pe))        
           (else (begin (code-gen (car pe)) (code-gen (cdr pe)))))
     ))
 
