@@ -1802,7 +1802,7 @@ done))
               ))
            
 
-           ;---------------------cond----------------not implimented TODO: seq
+           ;---------------------cond----------------not implimented 
            
            (pattern-rule
             `(cond ,(? 'onec (lambda (x) (andmap pair? x))))
@@ -2580,7 +2580,6 @@ done))
 
 (define gen-make-sob-fraction
   (lambda (value)
-    (display "fraction\n")
     (begin (ltc (push (imm  (ns (cadr value)))))
            (ltc (push (imm  (ns (car value)))))
            (ltc (call "MAKE_SOB_FRACTION")))))
@@ -2628,8 +2627,8 @@ done))
       (begin (define lab-else (lab-construct "L_if3_else_"))
              (define lab-exit (lab-construct "L_if3_exit_"))
              (code-gen (cadr pe))
-             ;(ltc (cmp "R0" "FALSE")) ;TODO: change to false
-             ;(ltc (jmp-eq lab-else))
+             (ltc (cmp "R0" (ns (const-lookup #f const-table))))
+             (ltc (jmp-eq lab-else))
              (code-gen (caddr pe))
              (ltc (jmp lab-exit))
              (labtc lab-else)
@@ -2643,7 +2642,7 @@ done))
              (map-in-order
               (lambda (l)
                 (begin (code-gen l)
-                       (ltc (cmp "R0" "FALSE")) ;TODO: change to false
+                       (ltc (cmp "R0" (ns (const-lookup #f const-table))))
                        (ltc (jmp-ne lab-exit)))) (cadr pe))
              (labtc lab-exit)
              )))
@@ -2739,7 +2738,7 @@ done))
                    (ltc (incr "R5"))
                    (ltc (incr "R4")))))
         (malloc "3" "R0")
-        (ltc (mov (indd "R0" "0") "TCLOSURE"))
+        (ltc (mov (indd "R0" "0") "T_CLOSURE"))
         (ltc (mov (indd "R0" "1") "R2"))
         (ltc (mov (indd "R0" "2") (lab body-leb)))
         (ltc (jmp exit-clos-leb))
@@ -2989,7 +2988,7 @@ done))
 (define gen-def
   (lambda (pe)
     (cond ((equal? 'fvar (caadr pe)) (def-fvar pe))
-          (else "NOT IMPL")) ;TODO
+          (else "NOT IMPL"))
     ))
 
 (define set-pvar
@@ -3134,6 +3133,68 @@ done))
       (ltc (mov (indd "R0" "1") "454545"))
       (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
       (ltc (mov "R1" (lookup-global 'cdr)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-denominator
+  (lambda ()
+    (let ((body-lab "LDenBody")
+          (closure-lab "LmakeDenClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (fparg "2")))
+      (ltc (cmp (ind "R0") "T_FRACTION"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (push (indd "R0" "2")))
+      (ltc (call "MAKE_SOB_INTEGER"))
+      (ltc (drop "1"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "454545"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'denominator)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-numerator
+  (lambda ()
+    (let ((body-lab "LNumBody")
+          (closure-lab "LmakeNumClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (fparg "2")))
+      (ltc (cmp (ind "R0") "T_FRACTION"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (push (indd "R0" "1")))
+      (ltc (call "MAKE_SOB_INTEGER"))
+      (ltc (drop "1"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "454545"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'numerator)))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
@@ -3314,49 +3375,49 @@ done))
 
  
 
-;(define maker-number?-rational? TODO
-;  (lambda (proc-name)
-;    (let ((closure-lab (lab-construct "TYPE_CLOS_"))
- ;         (body-lab (lab-construct "TYPE_BODY_")))
-  ;  (ltc (jmp closure-lab))
- ;   (labtc body-lab)
- ;   (ltc (push "FP"))
- ;   (ltc (mov "FP" "SP"))
- ;   (ltc (cmp (fparg "1") "1"))
- ;;   (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
- ;   (ltc (mov "R1" (fparg "2")))
- ;   (ltc (cmp (ind "R1") "T_INTEGER"))
- ; ;  (let ((not-type1 (lab-construct "NOT_TYPE1_"))
- ;         (exit-type (lab-construct "EXIT_TYPE_")))
- ;     (ltc (jmp-ne not-type1))
- ;     (ltc (mov "R0" (ns (const-lookup #t const-table))))
- ;     (ltc (jmp exit-type))
- ;     (labtc not-type1)
-;      (ltc (cmp (ind "R1") "T_FRACTION"))
-;      (let ((not-type2 (lab-construct "NOT_TYPE2_")))
-;        (ltc (jmp-ne not-type2))
-;        (ltc (mov "R0" (ns (const-lookup #t const-table))))
-  ;      (ltc (jmp exit-type))
-  ;      (labtc not-type2)
-   ;     (ltc (mov "R0" (ns (const-lookup #f const-table))))
-   ;;     (labtc exit-type)
-   ;     (ltc (pop "FP"))
-   ;     (ltc "RETURN")))
+(define maker-number?-rational?
+  (lambda (proc-name)
+    (let ((closure-lab (lab-construct "TYPE_CLOS_"))
+          (body-lab (lab-construct "TYPE_BODY_")))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") "T_INTEGER"))
+      (let ((not-type1 (lab-construct "NOT_TYPE1_"))
+            (exit-type (lab-construct "EXIT_TYPE_")))
+        (ltc (jmp-ne not-type1))
+        (ltc (mov "R0" (ns (const-lookup #t const-table))))
+        (ltc (jmp exit-type))
+        (labtc not-type1)
+        (ltc (cmp (ind "R1") "T_FRACTION"))
+        (let ((not-type2 (lab-construct "NOT_TYPE2_")))
+          (ltc (jmp-ne not-type2))
+          (ltc (mov "R0" (ns (const-lookup #t const-table))))
+          (ltc (jmp exit-type))
+          (labtc not-type2)
+          (ltc (mov "R0" (ns (const-lookup #f const-table))))
+          (labtc exit-type)
+          (ltc (pop "FP"))
+          (ltc "RETURN")))
+      
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "1515"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global proc-name)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 
-  ;  (labtc closure-lab)
-  ;  (ltc (push "3"))
-  ;  (ltc (call "MALLOC"))
-  ;  (ltc (drop "1"))
-  ;  (ltc (mov (ind "R0") "T_CLOSURE"))
-  ;  (ltc (mov (indd "R0" "1") "1515"))
-  ;  (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
-  ;  (ltc (mov "R1" (lookup-global proc-name)))
-  ;  (ltc (add "R1" "R15"))
-  ;  (ltc (mov (ind "R1") "R0"))
-  ;  )))
-
-;(define make-rational? (maker-number?-rational? 'rational?))
-;(define make-number? (maker-number?-rational? 'number?))
+(define make-rational? (lambda () (maker-number?-rational? 'rational?)))
+(define make-number? (lambda () (maker-number?-rational? 'number?)))
 ;---------------------------------end of predicate---------------------------------------------
 
 (define make-char->integer
@@ -3628,6 +3689,36 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
+(define make-remainder
+  (lambda ()
+    (let ((body-lab "RemainderBody")
+          (closure-lab "RemainderClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))     
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (indd (fparg "2") "1")))
+      (ltc (mov "R1" (indd (fparg "3") "1")))
+      (ltc (rem "R0" "R1"))
+      (ltc (push "R0"))
+      (ltc (call "MAKE_SOB_INTEGER"))
+      (ltc (drop "1"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+      
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8546845"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'remainder)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3678,7 +3769,7 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    (annotate-tc TODO
+    (annotate-tc
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
@@ -3726,8 +3817,9 @@ done))
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
-                                  'make-vector 'make-string 'string-ref 'vector-ref 'vector-set! 'string-set!))
-                                 ; 'rational? 'number?))TODO
+                                  ;'make-vector 'make-string
+                                  'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
+                                  'rational? 'number? 'remainder))
   
 (define add-run-to-list
   (lambda ()
@@ -3738,9 +3830,9 @@ done))
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
-                                 make-make-str make-make-vec make-str-ref make-vec-ref make-vec-set
-                                 make-str-set))
-;make-rational? make-number?)) TODO
+                                 ;make-make-str make-make-vec
+                                 make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
+                                 make-str-set make-rational? make-number? make-remainder))
 
 (define add-run-IMPL-function
   (lambda ()
