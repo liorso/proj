@@ -3483,7 +3483,7 @@ done))
 (define make-len-vec (lambda () (make-len-str-or-vec 'vector-length "T_VECTOR" 
                                           (lab-construct "VEC_LEN_BOD_") (lab-construct "VEC_LEN_CLO_"))))
 
-(define make-make-str-or-vec
+(define make-make-str-or-vec ;TODO!!!!
   (lambda (proc-name type body-lab closure-lab)
     (ltc (jmp closure-lab))
     (labtc body-lab)
@@ -3511,6 +3511,68 @@ done))
 
 (define make-make-vec (lambda () (make-make-str-or-vec 'make-vector "MAKE_SOB_VECTOR" (lab-construct "VEC_MAKE_BOD_")
                                                        (lab-construct "VEC_MAKE_CLO_"))))
+
+(define make-str-ref
+  (lambda ()
+     (let ((body-lab "StrRefBody")
+          (closure-lab "StrRefClos"))
+       (ltc (jmp closure-lab))
+       (labtc body-lab)
+       (ltc (push "FP"))
+       (ltc (mov "FP" "SP"))     
+       (ltc (cmp (fparg "1") "2"))
+       (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+       (ltc (mov "R2" (indd (fparg "3") "1")))
+       (ltc (add "R2" "2"))
+       (ltc (mov "R1" (fparg "2")))
+       (ltc (mov "R0" (indd "R1" "R2")))
+       (ltc (push "R0"))
+       (ltc (call "MAKE_SOB_CHAR"))
+       (ltc (drop "1"))
+       (ltc (pop "FP"))
+       (ltc "RETURN")
+       
+       (labtc closure-lab)
+       (ltc (push "3"))
+       (ltc (call "MALLOC"))
+       (ltc (drop "1"))
+       (ltc (mov (ind "R0") "T_CLOSURE"))
+       (ltc (mov (indd "R0" "1") "8546845"))
+       (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+       (ltc (mov "R1" (lookup-global 'string-ref)))
+       (ltc (add "R1" "R15"))
+       (ltc (mov (ind "R1") "R0"))
+       )))
+
+(define make-vec-ref
+  (lambda ()
+    (let ((body-lab "VecRefBody")
+          (closure-lab "VecRefClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))     
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R2" (indd (fparg "3") "1")))
+      (ltc (add "R2" "2"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (mov "R0" (indd "R1" "R2")))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+      
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8546845"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'vector-ref)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3609,7 +3671,7 @@ done))
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
-                                  'make-vector 'make-string))
+                                  'make-vector 'make-string 'string-ref 'vector-ref))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
@@ -3621,7 +3683,7 @@ done))
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
-                                 make-make-str make-make-vec))
+                                 make-make-str make-make-vec make-str-ref make-vec-ref))
 ;make-rational? make-number?)) TODO
 
 (define add-run-IMPL-function
