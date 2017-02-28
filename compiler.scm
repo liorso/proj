@@ -3225,7 +3225,6 @@ done))
     (ltc (push "3"))
     (ltc (call "MALLOC"))
     (ltc (drop "1"))
-    (ltc "INFO")
     (ltc (mov (ind "R0") "T_CLOSURE"))
     (ltc (mov (indd "R0" "1") "1515"))
     (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
@@ -3305,7 +3304,6 @@ done))
       (ltc (push "3"))
       (ltc (call "MALLOC"))
       (ltc (drop "1"))
-      (ltc "INFO")
       (ltc (mov (ind "R0") "T_CLOSURE"))
       (ltc (mov (indd "R0" "1") "1515"))
       (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
@@ -3349,7 +3347,6 @@ done))
   ;  (ltc (push "3"))
   ;  (ltc (call "MALLOC"))
   ;  (ltc (drop "1"))
-  ;  (ltc "INFO")
   ;  (ltc (mov (ind "R0") "T_CLOSURE"))
   ;  (ltc (mov (indd "R0" "1") "1515"))
   ;  (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
@@ -3364,8 +3361,8 @@ done))
 
 (define make-char->integer
   (lambda ()
-    (let ((body-lab "LSetcdrBody")
-          (closure-lab "LmakeSetCdrClos"))
+    (let ((body-lab "LCharToIntBody")
+          (closure-lab "LmakeCharToIntClos"))
       (ltc (jmp closure-lab))
       (labtc body-lab)
       (ltc (push "FP"))
@@ -3390,8 +3387,66 @@ done))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
- 
 
+(define make-integer->char
+  (lambda ()
+    (let ((body-lab "LIntToCharBody")
+          (closure-lab "LmakeIntToCharClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (fparg "2")))
+      (ltc (cmp (ind "R0") "T_INTEGER"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov (indd "R0" "0") "T_CHAR"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "963963"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'integer->char)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-not
+  (lambda ()
+    (let ((body-lab "LNotBody")
+          (closure-lab "LmakeNotClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))     
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (ns (const-lookup #f const-table))))
+      (ltc (cmp (fparg "2") "R0"))
+      (let ((exit-lab (lab-construct "EXIT_NOT_")))
+        (ltc (jmp-ne exit-lab))
+        (ltc (mov "R0" (ns (const-lookup #t const-table))))
+        (labtc exit-lab)
+        (ltc (pop "FP"))
+        (ltc "RETURN"))
+      
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8546845"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'not)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3489,17 +3544,17 @@ done))
 
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
-                                  char->integer))
+                                  'char->integer 'integer->char 'not))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
-  (lambda () ;TODO: to add all the runtime functions
+  (lambda ()
     (add-run-time-to-global run-time-func-name)
     ))
 (define run-time-func-impl (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
-                                 make-char->integer))
+                                 make-char->integer make-integer->char make-not))
 ;make-rational? make-number?)) TODO
 
 (define add-run-IMPL-function
