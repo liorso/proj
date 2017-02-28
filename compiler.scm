@@ -3447,6 +3447,39 @@ done))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
+
+(define make-len-str-or-vec
+  (lambda (proc-name type body-lab closure-lab)
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (cmp (ind "R1") type))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov "R0" (indd "R1" "1")))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "99999"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global proc-name)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      ))
+
+(define make-len-str (lambda () (make-len-str-or-vec 'string-length "T_STRING" 
+                                          (lab-construct "STR_LEN_BOD_") (lab-construct "STR_LEN_CLO_"))))
+
+(define make-len-vec (lambda () (make-len-str-or-vec 'vector-length "T_VECTOR" 
+                                          (lab-construct "VEC_LEN_BOD_") (lab-construct "VEC_LEN_CLO_"))))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3544,7 +3577,7 @@ done))
 
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
-                                  'char->integer 'integer->char 'not))
+                                  'char->integer 'integer->char 'not 'vector-length 'string-length))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
@@ -3554,7 +3587,7 @@ done))
 (define run-time-func-impl (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
-                                 make-char->integer make-integer->char make-not))
+                                 make-char->integer make-integer->char make-not make-len-vec make-len-str))
 ;make-rational? make-number?)) TODO
 
 (define add-run-IMPL-function
