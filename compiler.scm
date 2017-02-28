@@ -3198,6 +3198,8 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
+;------------------------------------predicate-----------------------------------------
+
 (define predicate-maker
   (lambda (proc-name type closure-lab body-lab)
     (ltc (jmp closure-lab))
@@ -3312,12 +3314,11 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
-;(define make-rational? (lambda () 1)) 
+ 
 
-;(define make-number?
-;  (lambda ()
-;    (let ((proc-name 'number?)
- ;;         (closure-lab (lab-construct "TYPE_CLOS_"))
+;(define maker-number?-rational? TODO
+;  (lambda (proc-name)
+;    (let ((closure-lab (lab-construct "TYPE_CLOS_"))
  ;         (body-lab (lab-construct "TYPE_BODY_")))
   ;  (ltc (jmp closure-lab))
  ;   (labtc body-lab)
@@ -3357,7 +3358,39 @@ done))
   ;  (ltc (mov (ind "R1") "R0"))
   ;  )))
 
+;(define make-rational? (maker-number?-rational? 'rational?))
+;(define make-number? (maker-number?-rational? 'number?))
+;---------------------------------end of predicate---------------------------------------------
 
+(define make-char->integer
+  (lambda ()
+    (let ((body-lab "LSetcdrBody")
+          (closure-lab "LmakeSetCdrClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (fparg "2")))
+      (ltc (cmp (ind "R0") "T_CHAR"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov (indd "R0" "0") "T_INTEGER"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "963963"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'char->integer)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+ 
 
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
@@ -3455,7 +3488,8 @@ done))
     ))
 
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
-                                  'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?))
+                                  'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
+                                  char->integer))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
@@ -3464,7 +3498,8 @@ done))
     ))
 (define run-time-func-impl (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?
                                  make-boolean? make-char? make-integer? make-null? 
-                                 make-procedure? make-string? make-symbol? make-vector? make-zero?))
+                                 make-procedure? make-string? make-symbol? make-vector? make-zero?
+                                 make-char->integer))
 ;make-rational? make-number?)) TODO
 
 (define add-run-IMPL-function
