@@ -1802,7 +1802,7 @@ done))
               ))
            
 
-           ;---------------------cond----------------not implimented TODO: seq
+           ;---------------------cond----------------not implimented 
            
            (pattern-rule
             `(cond ,(? 'onec (lambda (x) (andmap pair? x))))
@@ -2642,7 +2642,7 @@ done))
              (map-in-order
               (lambda (l)
                 (begin (code-gen l)
-                       (ltc (cmp "R0" (ns (const-lookup #f const-table)))) ;TODO: change to false
+                       (ltc (cmp "R0" (ns (const-lookup #f const-table))))
                        (ltc (jmp-ne lab-exit)))) (cadr pe))
              (labtc lab-exit)
              )))
@@ -2988,7 +2988,7 @@ done))
 (define gen-def
   (lambda (pe)
     (cond ((equal? 'fvar (caadr pe)) (def-fvar pe))
-          (else "NOT IMPL")) ;TODO
+          (else "NOT IMPL"))
     ))
 
 (define set-pvar
@@ -3133,6 +3133,68 @@ done))
       (ltc (mov (indd "R0" "1") "454545"))
       (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
       (ltc (mov "R1" (lookup-global 'cdr)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-denominator
+  (lambda ()
+    (let ((body-lab "LDenBody")
+          (closure-lab "LmakeDenClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (fparg "2")))
+      (ltc (cmp (ind "R0") "T_FRACTION"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (push (indd "R0" "2")))
+      (ltc (call "MAKE_SOB_INTEGER"))
+      (ltc (drop "1"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "454545"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'denominator)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-numerator
+  (lambda ()
+    (let ((body-lab "LNumBody")
+          (closure-lab "LmakeNumClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (fparg "2")))
+      (ltc (cmp (ind "R0") "T_FRACTION"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (push (indd "R0" "1")))
+      (ltc (call "MAKE_SOB_INTEGER"))
+      (ltc (drop "1"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "454545"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'numerator)))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
@@ -3677,7 +3739,7 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    (annotate-tc TODO
+    (annotate-tc
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
@@ -3726,7 +3788,7 @@ done))
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
                                   ;'make-vector 'make-string
-                                  'string-ref 'vector-ref 'vector-set! 'string-set!))
+                                  'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
@@ -3739,7 +3801,7 @@ done))
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
                                  ;make-make-str make-make-vec
-                                 make-str-ref make-vec-ref make-vec-set
+                                 make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
                                  make-str-set))
 ;make-rational? make-number?)) TODO
 
