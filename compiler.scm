@@ -3584,6 +3584,7 @@ done))
   (lambda ()
     (add-run-time-to-global run-time-func-name)
     ))
+
 (define run-time-func-impl (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
