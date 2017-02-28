@@ -3450,36 +3450,67 @@ done))
 
 (define make-len-str-or-vec
   (lambda (proc-name type body-lab closure-lab)
-      (ltc (jmp closure-lab))
-      (labtc body-lab)
-      (ltc (push "FP"))
-      (ltc (mov "FP" "SP"))
-      (ltc (cmp (fparg "1") "1"))
-      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
-      (ltc (mov "R1" (fparg "2")))
-      (ltc (cmp (ind "R1") type))
-      (ltc (jmp-ne "ERROR"))
-      (ltc (mov "R0" (indd "R1" "1")))
-      (ltc (pop "FP"))
-      (ltc "RETURN")
-
-      (labtc closure-lab)
-      (ltc (push "3"))
-      (ltc (call "MALLOC"))
-      (ltc (drop "1"))
-      (ltc (mov (ind "R0") "T_CLOSURE"))
-      (ltc (mov (indd "R0" "1") "99999"))
-      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
-      (ltc (mov "R1" (lookup-global proc-name)))
-      (ltc (add "R1" "R15"))
-      (ltc (mov (ind "R1") "R0"))
-      ))
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))
+    (ltc (cmp (fparg "1") "1"))
+    (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+    (ltc (mov "R1" (fparg "2")))
+    (ltc (cmp (ind "R1") type))
+    (ltc (jmp-ne "ERROR"))
+    (ltc (push (indd "R1" "1")))
+    (ltc (call "MAKE_SOB_INTEGER"))
+    (ltc (drop "1"))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "851479"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
 
 (define make-len-str (lambda () (make-len-str-or-vec 'string-length "T_STRING" 
                                           (lab-construct "STR_LEN_BOD_") (lab-construct "STR_LEN_CLO_"))))
 
 (define make-len-vec (lambda () (make-len-str-or-vec 'vector-length "T_VECTOR" 
                                           (lab-construct "VEC_LEN_BOD_") (lab-construct "VEC_LEN_CLO_"))))
+
+(define make-make-str-or-vec
+  (lambda (proc-name type body-lab closure-lab)
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc "INFO")
+    (ltc (pop "R0"))
+    (ltc (drop "1"))
+    (ltc (push "R0"))
+    (ltc "INFO")
+    (ltc (jmp type))
+    
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "851479"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
+
+(define make-make-str (lambda () (make-make-str-or-vec 'make-string "MAKE_SOB_STRING" (lab-construct "STR_MAKE_BOD_")
+                                                       (lab-construct "STR_MAKE_CLO_"))))
+
+(define make-make-vec (lambda () (make-make-str-or-vec 'make-vector "MAKE_SOB_VECTOR" (lab-construct "VEC_MAKE_BOD_")
+                                                       (lab-construct "VEC_MAKE_CLO_"))))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3577,7 +3608,8 @@ done))
 
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
-                                  'char->integer 'integer->char 'not 'vector-length 'string-length))
+                                  'char->integer 'integer->char 'not 'vector-length 'string-length
+                                  'make-vector 'make-string))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
@@ -3588,7 +3620,8 @@ done))
 (define run-time-func-impl (list make-cons make-car make-cdr make-set-car make-set-cdr make-pair?
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
-                                 make-char->integer make-integer->char make-not make-len-vec make-len-str))
+                                 make-char->integer make-integer->char make-not make-len-vec make-len-str
+                                 make-make-str make-make-vec))
 ;make-rational? make-number?)) TODO
 
 (define add-run-IMPL-function
