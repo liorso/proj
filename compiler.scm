@@ -3573,6 +3573,66 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
+(define make-vec-set
+  (lambda ()
+    (let ((body-lab "VecSetBody")
+          (closure-lab "VecSetClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))     
+      (ltc (cmp (fparg "1") "3"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (indd (fparg "3") "1")))
+      (ltc (add "R0" "2"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (mov (indd "R1" "R0") (fparg "4")))
+      (ltc (mov "R0" "T_VOID"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+      
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8546845"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'vector-set!)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define make-str-set
+  (lambda ()
+    (let ((body-lab "StrSetBody")
+          (closure-lab "StrSetClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))     
+      (ltc (cmp (fparg "1") "3"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (indd (fparg "3") "1")))
+      (ltc (add "R0" "2"))
+      (ltc (mov "R1" (fparg "2")))
+      (ltc (mov (indd "R1" "R0") (indd (fparg "4") "1")))
+      (ltc (mov "R0" "T_VOID"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+      
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8546845"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'string-set!)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3671,7 +3731,7 @@ done))
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
-                                  'make-vector 'make-string 'string-ref 'vector-ref))
+                                  'make-vector 'make-string 'string-ref 'vector-ref 'vector-set! 'string-set!))
                                  ; 'rational? 'number?))TODO
   
 (define add-run-to-list
@@ -3683,7 +3743,8 @@ done))
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
-                                 make-make-str make-make-vec make-str-ref make-vec-ref))
+                                 make-make-str make-make-vec make-str-ref make-vec-ref make-vec-set
+                                 make-str-set))
 ;make-rational? make-number?)) TODO
 
 (define add-run-IMPL-function
