@@ -3689,6 +3689,36 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
+(define make-remainder
+  (lambda ()
+    (let ((body-lab "RemainderBody")
+          (closure-lab "RemainderClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))     
+      (ltc (cmp (fparg "1") "2"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (indd (fparg "2") "1")))
+      (ltc (mov "R1" (indd (fparg "3") "1")))
+      (ltc (rem "R0" "R1"))
+      (ltc (push "R0"))
+      (ltc (call "MAKE_SOB_INTEGER"))
+      (ltc (drop "1"))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+      
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8546845"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'remainder)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3789,7 +3819,7 @@ done))
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
                                   ;'make-vector 'make-string
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
-                                  'rational? 'number?))
+                                  'rational? 'number? 'remainder))
   
 (define add-run-to-list
   (lambda ()
@@ -3802,8 +3832,7 @@ done))
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
                                  ;make-make-str make-make-vec
                                  make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
-                                 make-str-set
-make-rational? make-number?)) 
+                                 make-str-set make-rational? make-number? make-remainder))
 
 (define add-run-IMPL-function
   (lambda ()
