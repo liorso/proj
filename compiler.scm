@@ -3763,6 +3763,86 @@ done))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
+
+(define for2
+  (lambda (i do)
+    (let ((exit-loop (lab-construct "FOR_EXIT_"))
+          (start-loop (lab-construct "FOR_START_")))
+      (ltc (mov "R10" i))
+      (labtc start-loop)
+      (ltc (cmp "R10" "0"))
+      (ltc (jmp-eq exit-loop))
+      (do)
+      (ltc (decr "R10"))
+      (ltc (jmp start-loop))
+      (labtc exit-loop)  
+    )))
+
+(define make-vector-vector-runtime
+  (lambda (proc-name type body-lab closure-lab)
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))     
+    (ltc (mov "R1" (fparg "1")))
+    (ltc (mov "R2" "2"))
+    (for2 "R1" (lambda () (begin (ltc (mov "R3" (fparg "R2")))
+                                  (ltc (push "R3"))
+                                  (ltc (incr "R2")))))
+    (ltc (mov "R3" (fparg "1")))
+    (ltc (push "R3"))
+    (ltc (call type))
+    (ltc (incr "R3"))
+    (ltc (drop "R3"))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "8546845"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+    ))
+
+(define make-vector-runtime (lambda () (make-vector-vector-runtime 'vector "MAKE_SOB_VECTOR" "VecRunBod" "VecRunClo")))
+
+(define make-string-string-runtime
+  (lambda (proc-name type body-lab closure-lab)
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))     
+    (ltc (mov "R1" (fparg "1")))
+    (ltc (mov "R2" "2"))
+    (for2 "R1" (lambda () (begin (ltc (mov "R3" (indd (fparg "R2") "1")))
+                                  (ltc (push "R3"))
+                                  (ltc (incr "R2")))))
+    (ltc (mov "R3" (fparg "1")))
+    (ltc (push "R3"))
+    (ltc (call type))
+    (ltc (incr "R3"))
+    (ltc (drop "R3"))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "8546845"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
+
+(define make-string-runtime (lambda () (make-string-string-runtime 'string "MAKE_SOB_STRING" "StrRunBod" "StrRunClo")))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3863,7 +3943,7 @@ done))
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
                                   ;'make-vector 'make-string
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
-                                  'rational? 'number? 'remainder))
+                                  'rational? 'number? 'remainder 'vector 'string))
   
 (define add-run-to-list
   (lambda ()
@@ -3876,7 +3956,8 @@ done))
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
                                  ;make-make-str make-make-vec
                                  make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
-                                 make-str-set make-rational? make-number? make-remainder))
+                                 make-str-set make-rational? make-number? make-remainder make-vector-runtime
+                                 make-string-runtime))
 
 (define add-run-IMPL-function
   (lambda ()
