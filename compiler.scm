@@ -2706,7 +2706,7 @@ done))
         (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
         (set! major (+ 1  major))
         (code-gen (caddr pe))
-        (set! major (- 1 major))
+        (set! major (- major 1))
         (ltc (pop "FP"))
         (ltc "RETURN")
         (labtc exit-clos-leb)))
@@ -3011,10 +3011,21 @@ done))
            (ltc (mov "R0" (ind "R0")))
            )))
 
+(define gen-box-get-bvar
+  (lambda (pe)
+    (let ((major (ns (caddr (caadr pe))))
+          (minor (ns (caddr (cdaadr pe)))))
+      (ltc (mov "R0" (fparg "0")))
+      (ltc (mov "R0" (indd "R0" major)))
+      (ltc (mov "R0" (indd "R0" minor)))
+      (ltc (mov "R0" (ind "R0")))
+      )))
+
 (define gen-box-get
   (lambda (pe)
     (cond ((equal? 'fvar (caadr pe)) (get-box-fvar pe))
           ((equal? 'pvar (caadr pe)) (gen-box-get-pvar pe))
+          ((equal? 'bvar (caadr pe)) (gen-box-get-bvar pe))
           (else "NOT IMPL")) ;TODO
     ))
 
@@ -3884,6 +3895,37 @@ done))
 (define make-make-vec (lambda () (make-make-vector-runtime-help 'make-vector "MAKE_SOB_VECTOR" (lab-construct "VEC_MAKE_BOD_")
                                                        (lab-construct "VEC_MAKE_CLO_"))))
 
+
+(define make-apply
+  (lambda (proc-name type body-lab closure-lab)
+    (let ((body-lab "APPLY_BODY")
+          (closure-lab "APPLY_CLOSURE"))
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))     
+    (ltc (mov "R1" (indd (fparg "2") "1")))
+    (ltc (mov "R2" (fparg "3")))
+    (for2 "R1" (lambda () (ltc (push "R2"))))
+    (ltc (mov "R3" (indd (fparg "2") "1")))
+    (ltc (push "R3"))
+    (ltc (call type))
+    (ltc (incr "R3"))
+    (ltc (drop "R3"))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "8546845"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global apply)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3962,7 +4004,7 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    (annotate-tc
+    (annotate-tc 
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
@@ -3976,13 +4018,14 @@ done))
            (set! global-table (list))
            (set! constant-table (list))
            (set! major 0)
-           (set! next-free-global 0))
-    ))
+           (set! next-free-global 0)
+           (set! string-in "")
+           )))
 
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
-                                  'make-vector 'make-string
+                                  'make-vector 'make-string 'list
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string))
   
@@ -4020,7 +4063,8 @@ done))
 (define compile-scheme-file
   (lambda (in-file out-file)
     (begin (initial-params)
-           (set! string-in (file->string in-file)) ;V
+           ;(set! string-in (file->string "before.scm"))
+           (set! string-in (sa string-in (file->string in-file))) ;V
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
            (set! CODE (sa CODE (file->string "prolog.c")))
