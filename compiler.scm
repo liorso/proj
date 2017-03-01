@@ -3588,30 +3588,6 @@ done))
 (define make-len-vec (lambda () (make-len-str-or-vec 'vector-length "T_VECTOR" 
                                           (lab-construct "VEC_LEN_BOD_") (lab-construct "VEC_LEN_CLO_"))))
 
-(define make-make-str-or-vec ;TODO!!!!
-  (lambda (proc-name type body-lab closure-lab)
-    (ltc (jmp closure-lab))
-    (labtc body-lab)
-    (ltc (jmp type))
-    
-    (labtc closure-lab)
-    (ltc (push "3"))
-    (ltc (call "MALLOC"))
-    (ltc (drop "1"))
-    (ltc (mov (ind "R0") "T_CLOSURE"))
-    (ltc (mov (indd "R0" "1") "851479"))
-    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
-    (ltc (mov "R1" (lookup-global proc-name)))
-    (ltc (add "R1" "R15"))
-    (ltc (mov (ind "R1") "R0"))
-    ))
-
-(define make-make-str (lambda () (make-make-str-or-vec 'make-string "MAKE_SOB_STRING" (lab-construct "STR_MAKE_BOD_")
-                                                       (lab-construct "STR_MAKE_CLO_"))))
-
-(define make-make-vec (lambda () (make-make-str-or-vec 'make-vector "MAKE_SOB_VECTOR" (lab-construct "VEC_MAKE_BOD_")
-                                                       (lab-construct "VEC_MAKE_CLO_"))))
-
 (define make-str-ref
   (lambda ()
      (let ((body-lab "StrRefBody")
@@ -3843,6 +3819,71 @@ done))
     ))
 
 (define make-string-runtime (lambda () (make-string-string-runtime 'string "MAKE_SOB_STRING" "StrRunBod" "StrRunClo")))
+
+(define make-make-string-runtime-help
+  (lambda (proc-name type body-lab closure-lab)
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))     
+    (ltc (mov "R1" (indd (fparg "2") "1")))
+    (ltc (mov "R2" (indd (fparg "3") "1")))
+    (for2 "R1" (lambda () (ltc (push "R2"))))
+    (ltc (mov "R3" (indd (fparg "2") "1")))
+    (ltc (push "R3"))
+    (ltc (call type))
+    (ltc (incr "R3"))
+    (ltc (drop "R3"))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "8546845"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
+
+(define make-make-str (lambda () (make-make-string-runtime-help 'make-string "MAKE_SOB_STRING" (lab-construct "STR_MAKE_BOD_")
+                                                                (lab-construct "STR_MAKE_CLO_"))))
+
+(define make-make-vector-runtime-help
+  (lambda (proc-name type body-lab closure-lab)
+    (ltc (jmp closure-lab))
+    (labtc body-lab)
+    (ltc (push "FP"))
+    (ltc (mov "FP" "SP"))     
+    (ltc (mov "R1" (indd (fparg "2") "1")))
+    (ltc (mov "R2" (fparg "3")))
+    (for2 "R1" (lambda () (ltc (push "R2"))))
+    (ltc (mov "R3" (indd (fparg "2") "1")))
+    (ltc (push "R3"))
+    (ltc (call type))
+    (ltc (incr "R3"))
+    (ltc (drop "R3"))
+    (ltc (pop "FP"))
+    (ltc "RETURN")
+    
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "8546845"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global proc-name)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0"))
+    ))
+
+(define make-make-vec (lambda () (make-make-vector-runtime-help 'make-vector "MAKE_SOB_VECTOR" (lab-construct "VEC_MAKE_BOD_")
+                                                       (lab-construct "VEC_MAKE_CLO_"))))
+
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -3941,7 +3982,7 @@ done))
 (define run-time-func-name (list 'cons 'car 'cdr 'set-car! 'set-cdr! 'pair? 'boolean? 'char? 'integer?
                                   'null? 'number? 'procedure? 'rational? 'string? 'symbol? 'vector? 'zero?
                                   'char->integer 'integer->char 'not 'vector-length 'string-length
-                                  ;'make-vector 'make-string
+                                  'make-vector 'make-string
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string))
   
@@ -3954,7 +3995,7 @@ done))
                                  make-boolean? make-char? make-integer? make-null? 
                                  make-procedure? make-string? make-symbol? make-vector? make-zero?
                                  make-char->integer make-integer->char make-not make-len-vec make-len-str
-                                 ;make-make-str make-make-vec
+                                 make-make-str make-make-vec
                                  make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
                                  make-string-runtime))
