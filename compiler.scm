@@ -4070,6 +4070,63 @@ done))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
+
+(define make-math-eq-two
+  (lambda ()
+    (let ((body-lab "Math_eq_BODY")
+          (closure-lab "Math_eq_CLOSURE")
+          (first-not-int "Math_eq_FIRST_NOT_INT")
+          (check-second-int "Math_eq_CHECK_SECOND_INT")
+          (second-not-int "Math_eq_SECONS_NOT_INT")
+          (exit-check-int "Math_eq_EXIT_INT_CHECK")
+          (not-eq "Math_eq_NOT_eq")
+          (exit-eq "MATH_EQ_EX"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (mov "R1" (indd (fparg "2") "1")))
+      (ltc (mov "R3" (indd (fparg "3") "1")))
+      (ltc (cmp (ind (fparg "2")) "T_INTEGER"))
+      (ltc (jmp-ne first-not-int))
+      (ltc (mov "R2" "1"))
+      (ltc (jmp check-second-int))
+      (labtc first-not-int)
+      (ltc (mov "R2" (indd (fparg "2") "2")))
+      (labtc check-second-int)
+      (ltc (cmp (ind (fparg "3")) "T_INTEGER"))
+      (ltc (jmp-ne second-not-int))
+      (ltc (mov "R4" "1"))
+      (ltc (jmp exit-check-int))
+      (labtc second-not-int)
+      (ltc (mov "R4" (indd (fparg "3") "2")))
+      (labtc exit-check-int)
+      (ltc (mul "R1" "R4"))
+      (ltc (mul "R3" "R2"))
+      (ltc (sub "R1" "R3"))
+      (ltc (mul "R2" "R4"))
+      (ltc (cmp "R1" (imm "0")))
+      (ltc (jmp-ne not-eq))
+      (ltc (mov "R0" (ns (const-lookup #t const-table))))
+      (ltc (jmp exit-eq))
+      (labtc not-eq)
+      (ltc (mov "R0" (ns (const-lookup #f const-table))))
+      (labtc exit-eq)
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+    
+    
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "852963"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'math-eq-two)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -4172,7 +4229,7 @@ done))
                                   'make-vector 'make-string 'list
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string 'plus-two 'minus-two 'mul-two
-                                  'div-two))
+                                  'div-two 'math-eq-two))
   
 (define add-run-to-list
   (lambda ()
@@ -4186,7 +4243,8 @@ done))
                                  make-make-str make-make-vec
                                  make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
-                                 make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two))
+                                 make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two
+                                 make-math-eq-two))
 
 (define add-run-IMPL-function
   (lambda ()
