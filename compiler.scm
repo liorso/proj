@@ -2990,8 +2990,8 @@ done))
 
 (define gen-box-get-bvar
   (lambda (pe)
-    (let ((major (ns (caddr (caadr pe))))
-          (minor (ns (caddr (cdaadr pe)))))
+    (let ((major (ns (caddr (cadr pe))))
+          (minor (ns (cadddr (cadr pe)))))
       (ltc (mov "R0" (fparg "0")))
       (ltc (mov "R0" (indd "R0" major)))
       (ltc (mov "R0" (indd "R0" minor)))
@@ -4300,7 +4300,7 @@ done))
                                   'make-vector 'make-string 'list
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string 'plus-two 'minus-two 'mul-two
-                                  'div-two 'math-eq-two 'math-greater-two ;'math-less-two
+                                  'div-two 'math-eq-two 'math-greater-two
                                   ))
   
 (define add-run-to-list
@@ -4316,7 +4316,7 @@ done))
                                  make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
                                  make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two
-                                 make-math-eq-two make-math-greater-two ;make-math-less-two
+                                 make-math-eq-two make-math-greater-two
                                  ))
 
 (define add-run-IMPL-function
@@ -4339,7 +4339,7 @@ done))
 (define compile-scheme-file
   (lambda (in-file out-file)
     (begin (initial-params)
-           ;(set! string-in (file->string "before.scm"))
+           (set! string-in (file->string "before.scm"))
            (set! string-in (sa string-in (file->string in-file))) ;V
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
