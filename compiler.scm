@@ -4367,12 +4367,12 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    ;(annotate-tc TODO
+    (annotate-tc
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
         (eliminate-nested-defines
-         (parse sexps)))));)
+         (parse sexps))))))
     ))
 
 (define initial-params
@@ -4442,5 +4442,5 @@ done))
            (map-in-order gen-phrase-print manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V
-           manipulated
+           
            )))
