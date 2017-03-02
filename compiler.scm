@@ -4436,7 +4436,7 @@ done))
 (define compile-scheme-file
   (lambda (in-file out-file)
     (begin (initial-params)
-           (set! string-in (file->string "before.scm"))
+           ;(set! string-in (file->string "before.scm"))
            (set! string-in (sa string-in (file->string in-file))) ;V
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
@@ -4448,5 +4448,5 @@ done))
            (map-in-order gen-phrase-print manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
            (string->file CODE out-file) ;V  
-           manipulated  
+             
            )))
