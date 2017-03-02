@@ -3011,11 +3011,51 @@ done))
     (ltc (mov "R0" (imm (ns (const-lookup (cadr pe) const-table)))))
     ))
 
+(define box-pvar
+  (lambda (pe)
+    (let ((minor (caddr (cadr pe))))
+      (ltc (push "1"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") (fparg (ns (+ 2 minor)))))
+      )))
+
+(define box-bvar 
+  (lambda (pe)
+    (let ((major (ns (caddr (cadr pe))))
+          (minor (ns (cadddr (cadr pe)))))
+      (ltc (push "1"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov "R1" (fparg "0")))
+      (ltc (mov "R1" (indd "R1" major)))
+      (ltc (mov "R1" (indd "R1" minor)))
+      (ltc (mov (ind "R0") "R1"))
+      )))
+
+(define box-fvar 
+  (lambda (pe)
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (push "1"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "R1"))
+    ))
+
+(define gen-box
+  (lambda (pe)
+    (cond ((equal? 'fvar (caadr pe)) (box-fvar pe))
+          ((equal? 'pvar (caadr pe)) (box-pvar pe))
+          ((equal? 'bvar (caadr pe)) (box-bvar pe))
+          (else "NOT IMPL")) ;TODO
+    ))
+    
+
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
           ((equal? 'fvar (car pe)) (gen-fvar pe))
-
           ((equal? 'def (car pe)) (gen-def pe)) ;TODO
           ((equal? 'set (car pe)) (gen-set pe)) ;TODO
           ((equal? 'seq (car pe)) (map-in-order code-gen (cadr pe)))
@@ -3026,6 +3066,8 @@ done))
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe))   
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe))
           ((equal? 'box-get (car pe)) (gen-box-get pe))
+          ((equal? 'box (car pe)) (gen-box pe))
+          ((equal? 'box-set (car pe)) (gen-box pe))
           ((equal? 'pvar (car pe)) (gen-pvar pe))
           ((equal? 'bvar (car pe)) (gen-bvar pe))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
