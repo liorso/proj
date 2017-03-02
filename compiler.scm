@@ -2358,7 +2358,7 @@ done))
     (ltc (mov "R0" "T_VOID"))
     ))
 
-(define get-box-fvar
+(define gen-box-get-fvar
   (lambda (pe)
     (ltc (push "R1"))
     (ltc (mov "R1" (lookup-global (cadr pe))))
@@ -2975,10 +2975,22 @@ done))
            (ltc (mov "R0" "T_VOID"))
            )))
 
+(define set-bvar
+  (lambda (pe)
+    (let ((major (caddr (cadr pe)))
+          (minor (cadddr (cadr pe))))
+      (code-gen (caddr pe))
+      (ltc (mov "R1" (fparg "0")))
+      (ltc (mov "R1" (indd "R1" (ns major))))
+      (ltc (mov (indd "R1" (ns minor)) "R0")) 
+      (ltc (mov "R0" "T_VOID"))
+      )))
+
 (define gen-set
   (lambda (pe)
     (cond ((equal? 'fvar (caadr pe)) (set-fvar pe))
           ((equal? 'pvar (caadr pe)) (set-pvar pe))
+          ((equal? 'bvar (caadr pe)) (set-bvar pe))
           (else "NOT IMPL")) ;TODO
     ))
   
@@ -3000,9 +3012,19 @@ done))
 
 (define gen-box-get
   (lambda (pe)
-    (cond ((equal? 'fvar (caadr pe)) (get-box-fvar pe))
+    (cond ((equal? 'fvar (caadr pe)) (gen-box-get-fvar pe))
           ((equal? 'pvar (caadr pe)) (gen-box-get-pvar pe))
           ((equal? 'bvar (caadr pe)) (gen-box-get-bvar pe))
+          (else "NOT IMPL")) ;TODO
+    ))
+
+(define 
+
+(define gen-box-set
+  (lambda (pe)
+    (cond ((equal? 'fvar (caadr pe)) (gen-box-set-fvar pe))
+          ((equal? 'pvar (caadr pe)) (gen-box-set-pvar pe))
+          ((equal? 'bvar (caadr pe)) (gen-box-set-bvar pe))
           (else "NOT IMPL")) ;TODO
     ))
 
@@ -3067,7 +3089,7 @@ done))
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe))
           ((equal? 'box-get (car pe)) (gen-box-get pe))
           ((equal? 'box (car pe)) (gen-box pe))
-          ((equal? 'box-set (car pe)) (gen-box pe))
+          ((equal? 'box-set (car pe)) (gen-box-set pe))
           ((equal? 'pvar (car pe)) (gen-pvar pe))
           ((equal? 'bvar (car pe)) (gen-bvar pe))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
@@ -4318,12 +4340,12 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    (annotate-tc 
+    ;(annotate-tc TODO
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
         (eliminate-nested-defines
-         (parse sexps))))))
+         (parse sexps)))));)
     ))
 
 (define initial-params
