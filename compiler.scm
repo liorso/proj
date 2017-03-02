@@ -2358,7 +2358,7 @@ done))
     (ltc (mov "R0" "T_VOID"))
     ))
 
-(define get-box-fvar
+(define gen-box-get-fvar
   (lambda (pe)
     (ltc (push "R1"))
     (ltc (mov "R1" (lookup-global (cadr pe))))
@@ -2573,15 +2573,18 @@ done))
     ;(display "bool\n")
     (if (car value)
         (begin (ltc (push (imm  (ns 1))))
-               (ltc (call "MAKE_SOB_BOOL")))
+               (ltc (call "MAKE_SOB_BOOL"))
+               (ltc (drop "1")))
         (begin (ltc (push (imm  (ns 0))))
-               (ltc (call "MAKE_SOB_BOOL"))))))
+               (ltc (call "MAKE_SOB_BOOL"))
+               (ltc (drop "1"))))))
 
 (define gen-make-sob-integer
   (lambda (value)
     ;(display "int\n")
     (begin (ltc (push (imm  (ns (car value)))))
-           (ltc (call "MAKE_SOB_INTEGER")))))
+           (ltc (call "MAKE_SOB_INTEGER"))
+           (ltc (drop "1"))))) ;LIOR
 
 (define gen-make-sob-fraction
   (lambda (value)
@@ -2609,7 +2612,8 @@ done))
   (lambda (value)
     ;(display "symbol\n")
     (begin (ltc (push (imm (ns (car value)))))  ;;string address
-           (ltc (call "MAKE_SOB_SYMBOL")))))
+           (ltc (call "MAKE_SOB_SYMBOL"))
+           (ltc (drop "1")))))
 
 (define gen-make-sob-vector
   (lambda (value)
@@ -2806,7 +2810,7 @@ done))
                  (labtc lab-exit-stack-fix)
                  (set! major (+ 1  major))
                  (code-gen (cadddr pe))
-                 (set! major (- 1 major))
+                 (set! major (- major 1))
                  (ltc (pop "FP"))
                  (ltc "RETURN")
                  (labtc exit-clos-leb)))
@@ -2901,7 +2905,7 @@ done))
                  (labtc lab-exit-stack-fix)
                  (set! major (+ 1  major))
                  (code-gen (caddr pe))
-                 (set! major (- 1 major))
+                 (set! major (- major 1))
                  (ltc (pop "FP"))
                  (ltc "RETURN")
                  (labtc exit-clos-leb)))
@@ -2975,10 +2979,22 @@ done))
            (ltc (mov "R0" "T_VOID"))
            )))
 
+(define set-bvar
+  (lambda (pe)
+    (let ((major (caddr (cadr pe)))
+          (minor (cadddr (cadr pe))))
+      (code-gen (caddr pe))
+      (ltc (mov "R1" (fparg "0")))
+      (ltc (mov "R1" (indd "R1" (ns major))))
+      (ltc (mov (indd "R1" (ns minor)) "R0")) 
+      (ltc (mov "R0" "T_VOID"))
+      )))
+
 (define gen-set
   (lambda (pe)
     (cond ((equal? 'fvar (caadr pe)) (set-fvar pe))
           ((equal? 'pvar (caadr pe)) (set-pvar pe))
+          ((equal? 'bvar (caadr pe)) (set-bvar pe))
           (else "NOT IMPL")) ;TODO
     ))
   
@@ -3000,9 +3016,46 @@ done))
 
 (define gen-box-get
   (lambda (pe)
-    (cond ((equal? 'fvar (caadr pe)) (get-box-fvar pe))
+    (cond ((equal? 'fvar (caadr pe)) (gen-box-get-fvar pe))
           ((equal? 'pvar (caadr pe)) (gen-box-get-pvar pe))
           ((equal? 'bvar (caadr pe)) (gen-box-get-bvar pe))
+          (else "NOT IMPL")) ;TODO
+    ))
+
+(define gen-box-set-fvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov "R1" (ind "R1")))
+    (ltc (mov (ind "R1") "R0"))
+    (ltc (mov "R0" "T_VOID"))
+    ))
+
+(define gen-box-set-pvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov "R1" (fparg (ns (+ 2 (caddr (cadr pe)))))))
+    (ltc (mov (ind "R1") "R0"))
+    (ltc (mov "R0" "T_VOID"))
+    ))
+
+(define gen-box-set-bvar
+  (lambda (pe)
+    (let ((major (ns (caddr (cadr pe))))
+          (minor (ns (cadddr (cadr pe)))))
+      (code-gen (caddr pe))
+      (ltc (mov "R1" (fparg "0")))
+      (ltc (mov "R1" (indd "R1" major)))
+      (ltc (mov "R1" (indd "R1" minor)))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
+(define gen-box-set
+  (lambda (pe)
+    (cond ((equal? 'fvar (caadr pe)) (gen-box-set-fvar pe))
+          ((equal? 'pvar (caadr pe)) (gen-box-set-pvar pe))
+          ((equal? 'bvar (caadr pe)) (gen-box-set-bvar pe))
           (else "NOT IMPL")) ;TODO
     ))
 
@@ -3011,11 +3064,51 @@ done))
     (ltc (mov "R0" (imm (ns (const-lookup (cadr pe) const-table)))))
     ))
 
+(define box-pvar
+  (lambda (pe)
+    (let ((minor (caddr (cadr pe))))
+      (ltc (push "1"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") (fparg (ns (+ 2 minor)))))
+      )))
+
+(define box-bvar 
+  (lambda (pe)
+    (let ((major (ns (caddr (cadr pe))))
+          (minor (ns (cadddr (cadr pe)))))
+      (ltc (push "1"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov "R1" (fparg "0")))
+      (ltc (mov "R1" (indd "R1" major)))
+      (ltc (mov "R1" (indd "R1" minor)))
+      (ltc (mov (ind "R0") "R1"))
+      )))
+
+(define box-fvar 
+  (lambda (pe)
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (push "1"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "R1"))
+    ))
+
+(define gen-box
+  (lambda (pe)
+    (cond ((equal? 'fvar (caadr pe)) (box-fvar pe))
+          ((equal? 'pvar (caadr pe)) (box-pvar pe))
+          ((equal? 'bvar (caadr pe)) (box-bvar pe))
+          (else "NOT IMPL")) ;TODO
+    ))
+    
+
 (define code-gen
   (lambda (pe)
     (cond ((or (not (pair? pe)) (null? pe)) "")
           ((equal? 'fvar (car pe)) (gen-fvar pe))
-
           ((equal? 'def (car pe)) (gen-def pe)) ;TODO
           ((equal? 'set (car pe)) (gen-set pe)) ;TODO
           ((equal? 'seq (car pe)) (map-in-order code-gen (cadr pe)))
@@ -3026,6 +3119,8 @@ done))
           ((equal? 'lambda-opt (car pe)) (gen-lambda-opt pe))   
           ((equal? 'lambda-var (car pe)) (gen-lambda-var pe))
           ((equal? 'box-get (car pe)) (gen-box-get pe))
+          ((equal? 'box (car pe)) (gen-box pe))
+          ((equal? 'box-set (car pe)) (gen-box-set pe))
           ((equal? 'pvar (car pe)) (gen-pvar pe))
           ((equal? 'bvar (car pe)) (gen-bvar pe))
           ((equal? 'tc-applic (car pe)) (gen-applic-tc pe))
@@ -3339,6 +3434,7 @@ done))
       (ltc (mov "R1" (fparg "2")))
       (ltc (cmp (ind "R1") "T_INTEGER"))
       (let ((not-type (lab-construct "NOT_TYPE_"))
+            (check-zero (lab-construct "CHECK_ZERE_"))
             (not-int (lab-construct "NOT_INT"))
             (exit-type (lab-construct "EXIT_TYPE_")))
         (ltc (jmp-ne not-int))
@@ -3348,6 +3444,11 @@ done))
         (ltc (cmp (ind "R1") "T_FRACTION"))
         (ltc (jmp-ne not-type))
         (ltc (cmp (indd "R1" "2") (imm "1")))
+        (ltc (jmp-ne check-zero))
+        (ltc (mov "R0" (ns (const-lookup #t const-table))))
+        (ltc (jmp exit-type))
+        (labtc check-zero)
+        (ltc (cmp (indd "R1" "1") (imm "0")))
         (ltc (jmp-ne not-type))
         (ltc (mov "R0" (ns (const-lookup #t const-table))))
         (ltc (jmp exit-type))
@@ -4276,7 +4377,7 @@ done))
 
 (define parse-manipulate
   (lambda (sexps)
-    (annotate-tc 
+    (annotate-tc
      (pe->lex-pe
       (box-set 
        (remove-applic-lambda-nil
@@ -4350,6 +4451,6 @@ done))
            (add-run-IMPL-function)
            (map-in-order gen-phrase-print manipulated)
            (set! CODE (sa CODE (file->string "epilog.c")))
-           (string->file CODE out-file) ;V
-           manipulated
+           (string->file CODE out-file) ;V  
+             
            )))
