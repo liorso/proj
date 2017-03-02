@@ -3018,7 +3018,34 @@ done))
           (else "NOT IMPL")) ;TODO
     ))
 
-(define 
+(define gen-box-set-fvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov "R1" (lookup-global (cadr pe))))
+    (ltc (add "R1" "R15"))
+    (ltc (mov "R1" (ind "R1")))
+    (ltc (mov (ind "R1") "R0"))
+    (ltc (mov "R0" "T_VOID"))
+    ))
+
+(define gen-box-set-pvar
+  (lambda (pe)
+    (code-gen (caddr pe))
+    (ltc (mov "R1" (fparg (ns (+ 2 (caddr (cadr pe)))))))
+    (ltc (mov (ind "R1") "R0"))
+    (ltc (mov "R0" "T_VOID"))
+    ))
+
+(define gen-box-set-bvar
+  (lambda (pe)
+    (let ((major (ns (caddr (cadr pe))))
+          (minor (ns (cadddr (cadr pe)))))
+      (code-gen (caddr pe))
+      (ltc (mov "R1" (fparg "0")))
+      (ltc (mov "R1" (indd "R1" major)))
+      (ltc (mov "R1" (indd "R1" minor)))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 
 (define gen-box-set
   (lambda (pe)
