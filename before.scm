@@ -7,6 +7,4 @@
 (define = (lambda lq (letrec ((rec (lambda (lst) (if (null? (cdr lst)) #t (and (math-eq-two (car lst) (car (cdr lst))) (rec (cdr lst)))))))   (rec lq))))
 (define > (lambda lq (letrec ((rec (lambda (lst) (if (null? (cdr lst)) #t (and (math-greater-two (car lst) (car (cdr lst))) (rec (cdr lst)))))))   (rec lq))))
 ;(define < (lambda lq (not (or (apply = lq) (apply > lq)))))
-(define append (letrec ((append-helper (lambda (lst1 s2) (if (null? lst1) s2 (cons (car lst1) (append-helper (cdr lst1) s2))))) 
-	(append-helper2 (lambda (lst1 lst2) (if (null? lst2) lst1 (append-helper lst1 (append-helper2 (car lst2) (cdr lst2))))))) 
-	(lambda lst2 (if (null? lst2) '() (append-helper2 (car lst2) (cdr lst2))))))
+(define append (letrec ((append-helper (lambda (lst1 s2) (if (null? lst1) s2 (cons (car lst1) (append-helper (cdr lst1) s2)))))	(append-helper2 (lambda (lst1 lst2) (if (null? lst2) lst1 (append-helper lst1 (append-helper2 (car lst2) (cdr lst2))))))) (lambda lst2 (if (null? lst2) '() (append-helper2 (car lst2) (cdr lst2))))))

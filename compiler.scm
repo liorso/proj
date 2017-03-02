@@ -2573,15 +2573,18 @@ done))
     ;(display "bool\n")
     (if (car value)
         (begin (ltc (push (imm  (ns 1))))
-               (ltc (call "MAKE_SOB_BOOL")))
+               (ltc (call "MAKE_SOB_BOOL"))
+               (ltc (drop "1")))
         (begin (ltc (push (imm  (ns 0))))
-               (ltc (call "MAKE_SOB_BOOL"))))))
+               (ltc (call "MAKE_SOB_BOOL"))
+               (ltc (drop "1"))))))
 
 (define gen-make-sob-integer
   (lambda (value)
     ;(display "int\n")
     (begin (ltc (push (imm  (ns (car value)))))
-           (ltc (call "MAKE_SOB_INTEGER")))))
+           (ltc (call "MAKE_SOB_INTEGER"))
+           (ltc (drop "1"))))) ;LIOR
 
 (define gen-make-sob-fraction
   (lambda (value)
@@ -2609,7 +2612,8 @@ done))
   (lambda (value)
     ;(display "symbol\n")
     (begin (ltc (push (imm (ns (car value)))))  ;;string address
-           (ltc (call "MAKE_SOB_SYMBOL")))))
+           (ltc (call "MAKE_SOB_SYMBOL"))
+           (ltc (drop "1")))))
 
 (define gen-make-sob-vector
   (lambda (value)
@@ -2806,7 +2810,7 @@ done))
                  (labtc lab-exit-stack-fix)
                  (set! major (+ 1  major))
                  (code-gen (cadddr pe))
-                 (set! major (- 1 major))
+                 (set! major (- major 1))
                  (ltc (pop "FP"))
                  (ltc "RETURN")
                  (labtc exit-clos-leb)))
@@ -2901,7 +2905,7 @@ done))
                  (labtc lab-exit-stack-fix)
                  (set! major (+ 1  major))
                  (code-gen (caddr pe))
-                 (set! major (- 1 major))
+                 (set! major (- major 1))
                  (ltc (pop "FP"))
                  (ltc "RETURN")
                  (labtc exit-clos-leb)))
@@ -4436,7 +4440,7 @@ done))
 (define compile-scheme-file
   (lambda (in-file out-file)
     (begin (initial-params)
-           ;(set! string-in (file->string "before.scm"))
+           (set! string-in (file->string "before.scm"))
            (set! string-in (sa string-in (file->string in-file))) ;V
            (set! sexpes (make-sexpes string-in)) ;V
            (set! manipulated (map-in-order parse-manipulate sexpes)) ;V
