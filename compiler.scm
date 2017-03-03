@@ -3133,6 +3133,58 @@ done))
 ;--------------------------------------RUN TIME-----------------------------------
 ;---------------------------------------------------------------------------------
 
+(define make-apply-helper-runtime
+  (lambda ()
+    (let ((body-lab "LForApplyHellperBody")
+          (closure-lab "LForApplyHellperClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "R9" "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (mov "R1" (fparg "3"))) ;list
+      (ltc (mov "R2" "0"))
+      (ltc (mov "R4" "SP"))
+      (ltc (mov "R8" "SP"))
+      (ltc (sub "R8" "6"))
+      (ltc (mov "R3" (fparg "2")))
+      (ltc (cmp (indd "R3" "0") "T_CLOSURE"))
+      (ltc (jmp-ne "NOT_CLOSURE"))
+      (let ((while (lab-construct "WHILE_"))
+            (endwhile (lab-construct "END_WHILE_")))
+        (labtc while)
+        (ltc (cmp (indd "R1" "0") "T_NIL"))
+        (ltc (jmp-eq endwhile))
+        (ltc (push (indd "R1" "1")))
+        (ltc (mov "R1" (indd "R1" "2")))
+        (ltc (incr "R2"))
+        (ltc (jmp while))
+        (labtc endwhile))
+      (ltc (push "R2")) ;num of args
+      (ltc (push (indd "R3" "1"))) ;env
+      (ltc (push (fparg (ns -1)))) ;ret address
+      (ltc (add "R2" "3"))
+      (for "R2" (lambda () (begin (ltc (mov (stack "R8") (stack "R4")))
+                                  (ltc (incr "R8"))
+                                  (ltc (incr "R4")))))
+
+      (ltc (mov "FP" "R9"))
+      (ltc (mov "SP" "R8"))
+      (ltc (jmp (sa "*" (indd "R3" "2"))))
+                  
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "8888"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'apply-helper-runtime)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+  
 (define make-cons
   (lambda ()
     (let ((body-lab "LconsBody")
@@ -4401,7 +4453,7 @@ done))
                                   'make-vector 'make-string 'list
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string 'plus-two 'minus-two 'mul-two
-                                  'div-two 'math-eq-two 'math-greater-two
+                                  'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime
                                   ))
   
 (define add-run-to-list
@@ -4417,7 +4469,7 @@ done))
                                  make-str-ref make-vec-ref make-vec-set make-denominator make-numerator
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
                                  make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two
-                                 make-math-eq-two make-math-greater-two
+                                 make-math-eq-two make-math-greater-two make-apply-helper-runtime
                                  ))
 
 (define add-run-IMPL-function

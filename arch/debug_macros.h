@@ -34,9 +34,9 @@
   TRANS(R2, type1); TRANS(R3, type2);                                               \
   printf("R2 = %-10s R3 = %s\n", type1, type2);                                     \
   TRANS(R4, type1); TRANS(R5, type2);                                               \
-  printf("R4 = %-10s R5 = %-10s\n", type1, type2);                                   \
-  TRANS(R13, type1); TRANS(R15, type2);                                               \
-  printf("R13 = %-10s R15 = %-10s\n\n", type1, type2);                                   \
+  printf("R4 = %-10s R5 = %-10s\n", type1, type2);                                  \
+  TRANS(R13, type1); TRANS(R15, type2);                                             \
+  printf("R13 = %-10s R15 = %-10s\n\n", type1, type2);                              \
   printf("----------------------------\n");                                         \
   printf("Stack Info:\n");                                                          \
   printf("----------------------------\n");                                         \
@@ -49,7 +49,7 @@
   printf("----------------------------\n");                                         \
   printf("Memory Info:\n");                                                         \
   printf("----------------------------\n");                                         \
-  for (i = 0; i <= 300; i += 4) {                                               \
+  for (i = 0; i <= 400; i += 4) {                                                   \
     TRANS(IND(i), type1); TRANS(IND(i + 1), type2);                                 \
     TRANS(IND(i + 2) ,type3); TRANS(IND(i + 3), type4);                             \
     printf("MEM[%4d] = %-10s MEM[%d] = %-10s MEM[%4d] = %-10s MEM[%d] = %-10s\n",   \
