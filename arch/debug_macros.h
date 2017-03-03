@@ -49,7 +49,7 @@
   printf("----------------------------\n");                                         \
   printf("Memory Info:\n");                                                         \
   printf("----------------------------\n");                                         \
-  for (i = 0; i <= 300; i += 4) {                                               \
+  for (i = 0; i <= 7000; i += 4) {                                               \
     TRANS(IND(i), type1); TRANS(IND(i + 1), type2);                                 \
     TRANS(IND(i + 2) ,type3); TRANS(IND(i + 3), type4);                             \
     printf("MEM[%4d] = %-10s MEM[%d] = %-10s MEM[%4d] = %-10s MEM[%d] = %-10s\n",   \
