@@ -4454,27 +4454,7 @@ done))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
-(define make-symbol->string
-  (lambda ()
-    (let ((body-lab "ss_BODY")
-          (closure-lab "ss_CLOSURE"))
-      (ltc (jmp closure-lab))
-      (labtc body-lab)
-      (ltc (push "FP"))
-      (ltc (mov "FP" "SP"))
- (ltc (jmp "DELETE_ME"))
-    
-      (labtc closure-lab)
-      (ltc (push "3"))
-      (ltc (call "MALLOC"))
-      (ltc (drop "1"))
-      (ltc (mov (ind "R0") "T_CLOSURE"))
-      (ltc (mov (indd "R0" "1") "852963"))
-      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
-      (ltc (mov "R1" (lookup-global 'symbol->string)))
-      (ltc (add "R1" "R15"))
-      (ltc (mov (ind "R1") "R0"))
-      )))
+
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
