@@ -3627,7 +3627,9 @@ done))
       (ltc (mov "R0" (fparg "2")))
       (ltc (cmp (ind "R0") "T_CHAR"))
       (ltc (jmp-ne "ERROR"))
-      (ltc (mov (indd "R0" "0") "T_INTEGER"))
+	(ltc (push (indd "R0" "1")))
+      (ltc (call "MAKE_SOB_INTEGER"))
+	(ltc (drop "1"))
       (ltc (pop "FP"))
       (ltc "RETURN")
 
@@ -3654,9 +3656,9 @@ done))
       (ltc (cmp (fparg "1") "1"))
       (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
       (ltc (mov "R0" (fparg "2")))
-      (ltc (cmp (ind "R0") "T_INTEGER"))
-      (ltc (jmp-ne "ERROR"))
-      (ltc (mov (indd "R0" "0") "T_CHAR"))
+	(ltc (push (indd "R0" "1")))
+      (ltc (call "MAKE_SOB_CHAR"))
+	(ltc (drop "1"))
       (ltc (pop "FP"))
       (ltc "RETURN")
 
@@ -4379,6 +4381,69 @@ done))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
+(define make-eq?
+  (lambda ()
+    (let ((body-lab "eq_BODY")
+          (closure-lab "eq_CLOSURE"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+       (ltc (jmp "DELETE_ME"))
+    
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "852963"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'eq?)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+(define make-string->symbol
+  (lambda ()
+    (let ((body-lab "es_BODY")
+          (closure-lab "es_CLOSURE"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+ (ltc (jmp "DELETE_ME"))
+    
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "852963"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'string->symbol)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+(define make-symbol->string
+  (lambda ()
+    (let ((body-lab "ss_BODY")
+          (closure-lab "ss_CLOSURE"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+ (ltc (jmp "DELETE_ME"))
+    
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "852963"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'symbol->string)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
 
@@ -4462,7 +4527,8 @@ done))
       (box-set 
        (remove-applic-lambda-nil
         (eliminate-nested-defines
-         (parse sexps))))))
+         (parse sexps)))))
+)
     ))
 
 (define initial-params
@@ -4481,8 +4547,8 @@ done))
                                   'make-vector 'make-string 'list
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string 'plus-two 'minus-two 'mul-two
-                                  'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime ;'eq?
-                                  ;'symbol->string 'string->symbol
+                                  'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime 'eq?
+                                  'symbol->string 'string->symbol
                                   ))
   
 (define add-run-to-list
@@ -4499,7 +4565,7 @@ done))
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
                                  make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two
                                  make-math-eq-two make-math-greater-two make-apply-helper-runtime
-                                ; make-eq? make-symbol->string make-string->symbol
+                                 make-eq? make-symbol->string make-string->symbol
                                  ))
 
 (define add-run-IMPL-function
