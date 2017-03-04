@@ -8127,7 +8127,8 @@ done))
 
 (define make-rational? (lambda () (maker-number?-rational? 'rational?)))
 (define make-number? (lambda () (maker-number?-rational? 'number?)))
-;---------------------------------end of predicate---------------------------------------------
+
+ ;---------------------------------end of predicate---------------------------------------------
 
 (define make-char->integer
   (lambda ()
@@ -8996,7 +8997,8 @@ done))
                                   'make-vector 'make-string 'list
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string 'plus-two 'minus-two 'mul-two
-                                  'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime
+                                  'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime ;'eq?
+                                  ;'symbol->string 'string->symbol
                                   ))
   
 (define add-run-to-list
@@ -9013,6 +9015,7 @@ done))
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
                                  make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two
                                  make-math-eq-two make-math-greater-two make-apply-helper-runtime
+                                ; make-eq? make-symbol->string make-string->symbol
                                  ))
 
 (define add-run-IMPL-function
