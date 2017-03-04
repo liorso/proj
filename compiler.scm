@@ -9025,6 +9025,8 @@ done))
                      (let ((lab-void (lab-construct "VOID_NOT_PRINT_")))
                        (ltc (cmp "R0" "T_VOID"))
                        (ltc (jmp-eq lab-void))
+			(ltc (cmp (ind "R0") "T_VOID")) ;NEW Check
+                       (ltc (jmp-eq lab-void))
                        (ltc (push "R0"))
                        (ltc (call "WRITE_SOB"))
                        (ltc (drop "1"))
