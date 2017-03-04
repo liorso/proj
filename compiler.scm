@@ -3614,6 +3614,37 @@ done))
 
  ;---------------------------------end of predicate---------------------------------------------
 
+
+(define make-symbol->string
+  (lambda ()
+    (let ((body-lab "LSymbolToStringBody")
+          (closure-lab "LmakeSymbolToStringClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (ltc (mov "R0" (fparg "2")))
+      (ltc (cmp (ind "R0") "T_SYMBOL"))
+      (ltc (jmp-ne "ERROR"))
+      (ltc (mov  "R2" "R0"))
+      (ltc (mov  "R0" (indd "R2" "1")))
+      (ltc (pop "FP"))
+      (ltc "RETURN")
+
+      (labtc closure-lab)
+      (ltc (push "3"))
+      (ltc (call "MALLOC"))
+      (ltc (drop "1"))
+      (ltc (mov (ind "R0") "T_CLOSURE"))
+      (ltc (mov (indd "R0" "1") "765332"))
+      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+      (ltc (mov "R1" (lookup-global 'symbol->string)))
+      (ltc (add "R1" "R15"))
+      (ltc (mov (ind "R1") "R0"))
+      )))
+
 (define make-char->integer
   (lambda ()
     (let ((body-lab "LCharToIntBody")
@@ -4547,8 +4578,9 @@ done))
                                   'make-vector 'make-string 'list
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string 'plus-two 'minus-two 'mul-two
-                                  'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime 'eq?
-                                  'symbol->string 'string->symbol
+                                  'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime 'symbol->string
+                                  ;'eq? 'string->symbol
+
                                   ))
   
 (define add-run-to-list
@@ -4565,7 +4597,8 @@ done))
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
                                  make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two
                                  make-math-eq-two make-math-greater-two make-apply-helper-runtime
-                                 make-eq? make-symbol->string make-string->symbol
+                                 make-symbol->string ;make-eq? make-string->symbol
+
                                  ))
 
 (define add-run-IMPL-function
