@@ -5,15 +5,55 @@
  * Programmer: Mayer Goldberg, 2010
  */
 
+
  MAKE_SOB_FRACTION:
   PUSH(FP);
   MOV(FP, SP);
+  
+  MOV(R1, FPARG(0))
+  PUSH(R1);
+  CALL(ABS);
+  DROP(1);
+  PUSH(R0);
+
+  MOV(R2, FPARG(1));
+  PUSH(R2);
+  CALL(ABS);
+  DROP(1);
+  PUSH(R0)
+
+  CALL(GCD);
+  DROP(2);
+  PUSH(R0);
+
+  MOV(R1, FPARG(0));
+
+  PUSH(R1);
+  CALL(ABS);
+  DROP(1);
+
+  MOV (R1, R0);
+  MOV(R3, FPARG(0));
+  MOV(R2, FPARG(1));
+  DIV(R3, R1);
+  MUL(R2, R3);
+  POP(R0);
+  DIV(R1, R0);
+  DIV(R2, R0);
+  PUSH(R1);
+  PUSH(R2);
+
+ 
+
   PUSH(IMM(3));
   CALL(MALLOC);
   DROP(1);
   MOV(IND(R0), T_FRACTION);
-  MOV(INDD(R0, 2), FPARG(0));
-  MOV(INDD(R0, 1), FPARG(1));
+  POP(R2);
+  MOV(INDD(R0, 1), R2);
+  POP(R1);
+  MOV(INDD(R0, 2), R1);
+
   POP(FP);
   RETURN;
 
@@ -22,18 +62,13 @@ GCD:
   PUSH(FP)
   MOV(FP, SP)
 
-  CMP(FPARG(1), IMM(2));
+  /*CMP(FPARG(1), IMM(2));
   JUMP_NE(L_ERROR_INCORRECT_NUMBER_OF_ARGS);
-  MOV(R1, FPARG(2))
-  CMP(IND(R1), IMM(T_INTEGER));
-  JUMP_NE(L_ERROR_NOT_AN_INTEGER);
-  MOV(R2, FPARG(3));
-  CMP(IND(R2), IMM(T_INTEGER));
-  JUMP_NE(L_ERROR_NOT_AN_INTEGER);
-  CMP(INDD(R2, 1), IMM(0));
+  */
+  MOV(R1, FPARG(0));
+  MOV(R2, FPARG(1));
+  CMP(R2, IMM(0));
   JUMP_EQ(L_SECOND_ARG_CANNOT_BE_ZERO);
-  MOV(R1, INDD(R1, 1));
-  MOV(R2, INDD(R2, 1));
 
 GCD_LOOP:
   MOV(R3, R1);
@@ -45,9 +80,7 @@ GCD_LOOP:
   JUMP(GCD_LOOP);
 
 GCD_EXIT:
-  PUSH(R2);
-  CALL(MAKE_SOB_INTEGER);
-  DROP(1);
+  MOV(R0, R2);
 
   POP(FP);
   RETURN;
@@ -65,3 +98,6 @@ L_ERROR_NOT_AN_INTEGER:
 L_SECOND_ARG_CANNOT_BE_ZERO:
   fprintf(stderr, "The second argument cannot be zero\n");
   exit(-1);
+
+
+ 
