@@ -3645,6 +3645,69 @@ done))
       (ltc (mov (ind "R1") "R0"))
       )))
 
+(define make-string->symbol
+  (lambda ()
+    (let ((body-lab "LStringToSymbolBody")
+          (closure-lab "LmakeStringToSymbolClos"))
+      (ltc (jmp closure-lab))
+      (labtc body-lab)
+      (ltc (push "FP"))
+      (ltc (mov "FP" "SP"))
+      (ltc (cmp (fparg "1") "1"))
+      (ltc (jmp-ne "ERROR_NUM_OF_ARG"))
+      (let ((found (lab-construct "FOUND"))
+            (end_of_list (lab-construct "END_OF_SYMBOL_LIST"))
+            (next_symbol (lab-construct "NEXT_SYMBOL"))
+            (exit (lab-construct "EXIT")))
+        (ltc (push "R1"))
+        (ltc (push "R2"))
+        (ltc (push "R3"))
+        (ltc (mov "R2" (fparg "2")))
+        (ltc (mov "R3" (indd (fparg "2") "2")))
+        (ltc (mov "R1" "R16"))
+        (labtc next_symbol)
+        (ltc (cmp "R1" (imm "-1")))
+        (ltc (jmp-eq end_of_list))
+        (ltc (cmp "R3" (ind "R1")))
+        (ltc (jmp-eq found))
+        (ltc (mov "R2" (indd "R1" "1")))
+        (ltc (mov "R1" "R2"))
+        (ltc (jmp next_symbol))
+        (labtc found)
+        (ltc (mov "R0" "R1"))
+        (jmp exit)
+        (labtc end_of_list)
+        (ltc (push "R1"))
+        (ltc (push "R2"))
+        (ltc (push "R3"))
+        (ltc (push "2"))
+        (ltc (call "MALLOC"))
+        (ltc (drop "1"))
+        (ltc "INFO")
+        (ltc (pop "R3"))
+        (ltc (pop "R2"))
+        (ltc (pop "R1"))
+        (ltc (mov (ind "R0") "R3"))
+        (ltc (mov (indd "R0" "1") "R1"))
+        (ltc (mov "R16" "R0"))
+        (ltc "INFO")
+        (labtc exit)
+        (ltc (pop "R3"))
+        (ltc (pop "R2"))
+        (ltc (pop "R1"))
+        (ltc (pop "FP"))
+        (ltc "RETURN"))
+    (labtc closure-lab)
+    (ltc (push "3"))
+    (ltc (call "MALLOC"))
+    (ltc (drop "1"))
+    (ltc (mov (ind "R0") "T_CLOSURE"))
+    (ltc (mov (indd "R0" "1") "765441"))
+    (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
+    (ltc (mov "R1" (lookup-global 'string->symbol)))
+    (ltc (add "R1" "R15"))
+    (ltc (mov (ind "R1") "R0")))))
+
 (define make-char->integer
   (lambda ()
     (let ((body-lab "LCharToIntBody")
@@ -4433,27 +4496,7 @@ done))
       (ltc (add "R1" "R15"))
       (ltc (mov (ind "R1") "R0"))
       )))
-(define make-string->symbol
-  (lambda ()
-    (let ((body-lab "es_BODY")
-          (closure-lab "es_CLOSURE"))
-      (ltc (jmp closure-lab))
-      (labtc body-lab)
-      (ltc (push "FP"))
-      (ltc (mov "FP" "SP"))
- (ltc (jmp "DELETE_ME"))
-    
-      (labtc closure-lab)
-      (ltc (push "3"))
-      (ltc (call "MALLOC"))
-      (ltc (drop "1"))
-      (ltc (mov (ind "R0") "T_CLOSURE"))
-      (ltc (mov (indd "R0" "1") "852963"))
-      (ltc (mov (indd "R0" "2") (sa "LABEL(" body-lab ")")))
-      (ltc (mov "R1" (lookup-global 'string->symbol)))
-      (ltc (add "R1" "R15"))
-      (ltc (mov (ind "R1") "R0"))
-      )))
+
 
 ;------------------------------------------------------------------------------
 ;-----------------------------------------Compile-------------------------------
@@ -4559,7 +4602,7 @@ done))
                                   'string-ref 'vector-ref 'vector-set! 'string-set! 'denominator 'numerator
                                   'rational? 'number? 'remainder 'vector 'string 'plus-two 'minus-two 'mul-two
                                   'div-two 'math-eq-two 'math-greater-two 'apply-helper-runtime 'symbol->string
-                                  ;'eq? 'string->symbol
+                                  'string->symbol ;'eq?
 
                                   ))
   
@@ -4577,7 +4620,7 @@ done))
                                  make-str-set make-rational? make-number? make-remainder make-vector-runtime
                                  make-string-runtime make-plus-two make-minus-two make-mul-two make-div-two
                                  make-math-eq-two make-math-greater-two make-apply-helper-runtime
-                                 make-symbol->string ;make-eq? make-string->symbol
+                                 make-symbol->string  make-string->symbol ;make-eq?
 
                                  ))
 
