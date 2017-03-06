@@ -37,10 +37,12 @@
   printf("R4 = %-10s R5 = %-10s\n", type1, type2);                                  \
   TRANS(R13, type1); TRANS(R15, type2);                                             \
   printf("R13 = %-10s R15 = %-10s\n\n", type1, type2);                              \
+  TRANS(R16, type1); TRANS(R15, type2);                                             \
+  printf("R16 = %-10s R15 = %-10s\n\n", type1, type2);                              \
   printf("----------------------------\n");                                         \
   printf("Stack Info:\n");                                                          \
   printf("----------------------------\n");                                         \
-  int i;                                                                            \
+  int i;                                                                           \
   for (i = SP; i >= 0; i--) {                                                       \
     TRANS(STACK(i), type1);                                                         \
     printf("STACK[%2d] = %s\n", i, type1);                                          \

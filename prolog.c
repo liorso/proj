@@ -23,3 +23,4 @@ PUSH(0);
 PUSH(0);
 PUSH(0);
 MOV(FP, SP);
+MOV(R16, IMM(-1));
