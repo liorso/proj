@@ -3712,7 +3712,7 @@ done))
         (ltc (jmp equal))
 
         (labtc check_R4_integer)
-        (ltc (cmp (ind "R3") (imm "T_INTEGER")))
+        (ltc (cmp (ind "R4") (imm "T_INTEGER")))
         (ltc (jmp-ne not_equal))
         (ltc (mov "R5" "R3"))
         (ltc (mov "R3" "R4"))
