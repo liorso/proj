@@ -3712,7 +3712,7 @@ done))
         (ltc (jmp equal))
 
         (labtc check_R4_integer)
-        (ltc (cmp (ind "R3") (imm "T_INTEGER")))
+        (ltc (cmp (ind "R4") (imm "T_INTEGER")))
         (ltc (jmp-ne not_equal))
         (ltc (mov "R5" "R3"))
         (ltc (mov "R3" "R4"))
@@ -3743,17 +3743,14 @@ done))
        
         
         (labtc not_equal)
-        (ltc (mov "R0" (imm "0")))
+        (ltc (mov "R0" (ns (const-lookup #f const-table))))
         (ltc (jmp exit))
 
         (labtc equal)
-        (ltc (mov "R0" (imm "1")))
+        (ltc (mov "R0" (ns (const-lookup #t const-table))))
         (ltc (jmp exit)) 
           
         (labtc exit)        
-        (ltc (push "R0"))
-        (ltc (call "MAKE_SOB_BOOL"))
-        (ltc (drop "1"))
         (ltc (pop "R5"))
         (ltc (pop "R4"))
         (ltc (pop "R3"))
